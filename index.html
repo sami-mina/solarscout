@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0B1026">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SolarScout">
+<title>SolarScout — PV Site Assessment</title>
+<link rel="apple-touch-icon" id="touchIcon" href="">
+<link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet">
+<script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0B1026; --bg2:#141B3D; --bg3:#1C2552;
+  --sun:#FFB020; --sun2:#FF6B3D; --rose:#E0457B;
+  --txt:#F4F6FF; --muted:#9AA3C7; --line:rgba(255,255,255,.12);
+  --glass:rgba(12,17,42,.82); --ok:#2EE6A8; --danger:#FF5470;
+  --st:env(safe-area-inset-top,0px); --sb:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:Sora,system-ui,-apple-system,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer}
+input,select{font-family:inherit}
+.screen{position:fixed;inset:0;display:none}
+.screen.active{display:block}
+svg{display:block}
+
+/* ---------- SPLASH ---------- */
+#splash{background:radial-gradient(130% 75% at 50% 108%,#FF6B3D 0%,#D9406F 22%,#5A2A86 45%,#1A1A4E 65%,#0B1026 85%);overflow:hidden}
+#stars{position:absolute;inset:0;pointer-events:none}
+.star{position:absolute;width:2px;height:2px;border-radius:50%;background:#fff;animation:tw 3s infinite ease-in-out}
+@keyframes tw{0%,100%{opacity:.2}50%{opacity:1}}
+.sunwrap{position:absolute;left:50%;top:calc(var(--st) + 9vh);transform:translateX(-50%);width:200px;height:200px}
+.rays{position:absolute;inset:0;animation:spin 40s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sunCore{position:absolute;inset:50px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#FFF3C4,#FFB020 45%,#FF6B3D 100%);box-shadow:0 0 60px 20px rgba(255,160,40,.55),0 0 140px 60px rgba(255,107,61,.25);animation:pulse 4s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+.brand{position:absolute;left:0;right:0;top:calc(var(--st) + 9vh + 215px);text-align:center;padding:0 24px}
+.brand h1{margin:0;font-size:44px;font-weight:800;letter-spacing:-1.5px;line-height:1}
+.brand h1 span{background:linear-gradient(90deg,#FFD66B,#FF6B3D);-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand p{margin:10px 0 0;color:#D8DCF5;font-size:14px;opacity:.85}
+.field{position:absolute;left:-30%;right:-30%;bottom:-6%;height:46%;transform:perspective(380px) rotateX(58deg);transform-origin:50% 0;
+  background:
+   repeating-linear-gradient(90deg,rgba(130,180,255,.55) 0 2px,transparent 2px 46px),
+   repeating-linear-gradient(0deg,rgba(130,180,255,.55) 0 2px,transparent 2px 30px),
+   linear-gradient(180deg,#22357E,#0E1640);
+  -webkit-mask-image:linear-gradient(180deg,transparent,#000 30%);mask-image:linear-gradient(180deg,transparent,#000 30%);
+  animation:fieldmove 3s linear infinite}
+@keyframes fieldmove{to{background-position:0 0,0 30px,0 0}}
+.actions{position:absolute;left:24px;right:24px;bottom:calc(var(--sb) + 34px);display:flex;flex-direction:column;gap:14px;z-index:2}
+.btn-primary{display:flex;align-items:center;justify-content:center;gap:10px;height:58px;border-radius:18px;font-size:17px;font-weight:700;color:#1B0E00;
+  background:linear-gradient(95deg,#FFD66B,#FFB020 40%,#FF6B3D);box-shadow:0 10px 30px rgba(255,120,40,.45),inset 0 1px 0 rgba(255,255,255,.6)}
+.btn-primary:active{transform:scale(.98)}
+.btn-ghost{display:flex;align-items:center;justify-content:center;gap:10px;height:58px;border-radius:18px;font-size:17px;font-weight:600;
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.btn-ghost:active{transform:scale(.98)}
+.badge{font-size:12px;background:rgba(255,255,255,.18);padding:2px 8px;border-radius:99px}
+.ver{position:absolute;bottom:calc(var(--sb) + 10px);left:0;right:0;text-align:center;font-size:11px;color:rgba(255,255,255,.55);z-index:2}
+
+/* ---------- PROJECTS ---------- */
+#projects{background:linear-gradient(180deg,#141B3D,#0B1026);overflow:auto}
+.phead{position:sticky;top:0;display:flex;align-items:center;gap:12px;padding:calc(var(--st) + 14px) 16px 14px;background:rgba(11,16,38,.9);backdrop-filter:blur(10px);z-index:2}
+.phead h2{margin:0;font-size:22px}
+.plist{padding:6px 16px calc(var(--sb) + 30px);display:flex;flex-direction:column;gap:12px}
+.pcard{display:flex;gap:14px;align-items:center;padding:14px;border-radius:18px;background:var(--bg3);border:1px solid var(--line)}
+.pthumb{width:52px;height:52px;border-radius:14px;flex:none;background:linear-gradient(135deg,#FFB020,#FF6B3D);display:grid;place-items:center}
+.pinfo{flex:1;min-width:0}
+.pinfo b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pinfo small{display:block;color:var(--muted);font-size:12px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.empty{text-align:center;color:var(--muted);padding:60px 20px}
+
+/* ---------- MAP SCREEN ---------- */
+#map{position:absolute;inset:0;background:#05070f}
+.iconbtn{width:46px;height:46px;flex:none;border-radius:14px;display:grid;place-items:center;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.iconbtn:active{transform:scale(.95)}
+.topbar{position:absolute;top:calc(var(--st) + 10px);left:10px;right:10px;display:flex;gap:8px;z-index:5}
+.search{flex:1;min-width:0;display:flex;align-items:center;height:46px;border-radius:14px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:0 6px 0 14px}
+.search input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--txt);font-size:15px}
+.search input::placeholder{color:var(--muted)}
+.search button{width:36px;height:36px;display:grid;place-items:center;border-radius:10px}
+#results{position:absolute;top:calc(var(--st) + 62px);left:10px;right:10px;z-index:6;border-radius:16px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);overflow:hidden;display:none}
+#results div{padding:12px 14px;border-bottom:1px solid var(--line);font-size:14px}
+#results div:last-child{border:0}
+#results div small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.steps{position:absolute;top:calc(var(--st) + 64px);left:10px;right:10px;display:flex;gap:6px;z-index:4;overflow-x:auto;scrollbar-width:none}
+.steps::-webkit-scrollbar{display:none}
+.chip{flex:none;display:flex;align-items:center;gap:6px;height:32px;padding:0 12px 0 6px;border-radius:99px;font-size:12px;font-weight:600;background:var(--glass);border:1px solid var(--line);color:var(--muted);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.chip i{font-style:normal;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.1);font-size:11px}
+.chip.done{color:var(--txt)} .chip.done i{background:var(--ok);color:#00261A}
+.chip.active{color:#1B0E00;background:linear-gradient(95deg,#FFD66B,#FF8A3D);border-color:transparent}
+.chip.active i{background:rgba(0,0,0,.18);color:#1B0E00}
+.chip.locked{opacity:.55}
+.fabs{position:absolute;right:10px;bottom:calc(var(--sb) + 24px);display:flex;flex-direction:column;gap:10px;z-index:4}
+.fab{width:56px;height:56px;border-radius:18px;display:grid;place-items:center;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);position:relative}
+.fab.main{background:linear-gradient(135deg,#FFD66B,#FF6B3D);border:0;box-shadow:0 8px 24px rgba(255,120,40,.45)}
+.fab:active{transform:scale(.95)}
+.fab .lbl{position:absolute;right:66px;white-space:nowrap;font-size:12px;font-weight:600;background:var(--glass);padding:6px 10px;border-radius:10px;border:1px solid var(--line);pointer-events:none}
+#summary{position:absolute;left:10px;bottom:calc(var(--sb) + 24px);right:78px;z-index:4;display:none;padding:12px 14px;border-radius:18px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+#summary .row{display:flex;gap:16px}
+#summary .k{font-size:20px;font-weight:800}
+#summary .k small{font-size:11px;font-weight:500;color:var(--muted);margin-left:3px}
+#summary .l{font-size:11px;color:var(--muted)}
+#drawBar{position:absolute;left:10px;right:10px;bottom:calc(var(--sb) + 20px);z-index:7;display:none;padding:12px;border-radius:20px;background:var(--glass);border:1px solid rgba(255,176,32,.5);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+#drawBar .info{font-size:13px;margin:0 4px 10px;display:flex;justify-content:space-between;gap:8px}
+#drawBar .info b{color:var(--sun)}
+#drawBar .btns{display:flex;gap:8px}
+#drawBar .btns button{flex:1;height:46px;border-radius:14px;font-weight:700;font-size:14px;background:rgba(255,255,255,.1);border:1px solid var(--line)}
+#drawBar .btns .go{background:linear-gradient(95deg,#FFD66B,#FF8A3D);color:#1B0E00;border:0}
+#drawBar .btns button:disabled{opacity:.4}
+.crosshair{position:absolute;left:50%;top:50%;width:36px;height:36px;margin:-18px 0 0 -18px;pointer-events:none;z-index:3;display:none}
+.edgeLbl{font-size:11px;font-weight:700;padding:2px 6px;border-radius:7px;background:rgba(11,16,38,.85);color:#FFD66B;border:1px solid rgba(255,176,32,.5);pointer-events:none;white-space:nowrap}
+.pin{width:22px;height:22px;border-radius:50%;background:var(--sun);border:3px solid #fff;box-shadow:0 0 0 6px rgba(255,176,32,.35),0 4px 10px rgba(0,0,0,.5)}
+
+/* bottom sheet */
+#sheet{position:absolute;left:0;right:0;bottom:0;z-index:8;max-height:78vh;overflow-y:auto;overscroll-behavior:contain;background:#10173A;border-top-left-radius:26px;border-top-right-radius:26px;border-top:1px solid var(--line);box-shadow:0 -20px 50px rgba(0,0,0,.5);transform:translateY(105%);transition:transform .32s cubic-bezier(.2,.8,.2,1);padding:0 16px calc(var(--sb) + 22px)}
+#sheet.open{transform:translateY(0)}
+.handle{position:sticky;top:0;background:#10173A;padding:10px 0 6px;z-index:2}
+.handle:before{content:"";display:block;width:44px;height:5px;border-radius:9px;background:rgba(255,255,255,.25);margin:0 auto}
+.shead{display:flex;align-items:flex-start;gap:10px;margin:4px 0 6px}
+.shead h3{margin:0;font-size:19px}
+.shead p{margin:3px 0 0;font-size:12px;color:var(--muted)}
+.shead .sp{flex:1}
+.sbtn{height:36px;padding:0 12px;border-radius:11px;font-size:12px;font-weight:600;background:rgba(255,255,255,.08);border:1px solid var(--line);display:inline-flex;align-items:center;gap:6px}
+.sbtn.danger{color:var(--danger)}
+h4{margin:20px 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted)}
+.mods{display:flex;flex-direction:column;gap:10px}
+.mod{border-radius:16px;border:1.5px solid var(--line);background:var(--bg3);padding:12px 14px}
+.mod.sel{border-color:var(--sun);background:linear-gradient(180deg,rgba(255,176,32,.12),rgba(255,176,32,.03))}
+.mod .top{display:flex;align-items:center;gap:10px}
+.mod .top .nm{flex:1;min-width:0}
+.mod .top .nm b{display:block;font-size:14px}
+.mod .top .nm small{color:var(--muted);font-size:11px}
+.mod .w{font-weight:800;font-size:18px;color:var(--sun)}
+.mod .w small{font-size:11px}
+.radio{width:22px;height:22px;border-radius:50%;border:2px solid var(--muted);flex:none;display:grid;place-items:center}
+.mod.sel .radio{border-color:var(--sun)} .mod.sel .radio:after{content:"";width:10px;height:10px;border-radius:50%;background:var(--sun)}
+.ds{display:none;margin-top:10px;display:none;grid-template-columns:1fr 1fr;gap:4px 14px;font-size:12px}
+.mod.sel .ds{display:grid}
+.ds span{color:var(--muted)} .ds span b{color:var(--txt);font-weight:600;float:right}
+.note{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5}
+.seg{display:flex;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:13px;padding:3px;gap:3px}
+.seg button{flex:1;height:38px;border-radius:10px;font-size:13px;font-weight:600;color:var(--muted)}
+.seg button.on{background:var(--bg3);color:var(--txt);box-shadow:0 2px 8px rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.12)}
+.lbl2{font-size:12px;color:var(--muted);margin:14px 0 6px;display:block}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.inp{min-width:0;display:flex;align-items:center;height:44px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid var(--line);padding:0 12px}
+.inp input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--txt);font-size:15px;font-weight:600}
+.inp input::placeholder{color:var(--muted);font-weight:500}
+.inp span{color:var(--muted);font-size:12px}
+.inpLbl{font-size:11px;color:var(--muted);margin-bottom:5px}
+.go-btn{margin-top:20px;width:100%}
+.stats{margin-top:16px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--bg3);border:1px solid var(--line);border-radius:14px;padding:10px}
+.stat b{display:block;font-size:17px}
+.stat small{font-size:10px;color:var(--muted)}
+.next{margin-top:14px;display:flex;align-items:center;gap:12px;padding:14px;border-radius:16px;border:1px dashed rgba(255,255,255,.25);color:var(--muted);font-size:13px}
+
+/* mode chooser */
+.modeCard{display:flex;gap:14px;align-items:center;text-align:left;width:100%;padding:16px;border-radius:18px;background:var(--bg3);border:1.5px solid var(--line);margin-bottom:12px}
+.modeCard .ic{width:52px;height:52px;border-radius:15px;flex:none;display:grid;place-items:center;font-size:26px;background:linear-gradient(135deg,#FFD66B,#FF6B3D)}
+.modeCard b{display:block;font-size:16px}
+.modeCard small{display:block;color:var(--muted);font-size:12px;margin-top:3px;line-height:1.4}
+.modeCard.off{opacity:.55}.modeCard.off .ic{background:rgba(255,255,255,.12)}
+.soon{display:inline-block;font-size:10px;font-weight:700;color:#1B0E00;background:var(--sun);padding:2px 7px;border-radius:99px;margin-left:6px;vertical-align:middle}
+.fab.obs{background:rgba(255,84,112,.18);border-color:rgba(255,84,112,.6)}
+.types{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.types button{height:46px;border-radius:12px;font-size:12.5px;font-weight:600;background:rgba(255,255,255,.06);border:1.5px solid var(--line);text-align:left;padding:0 10px;display:flex;align-items:center;gap:8px}
+.types button.on{border-color:var(--danger);background:rgba(255,84,112,.14)}
+.edgeRow{display:grid;grid-template-columns:44px 1fr 92px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.edgeRow .e{font-weight:800;color:var(--sun)}
+.edgeRow small{color:var(--muted);font-size:11px;display:block}
+.edgeRow .inp{height:38px}
+/* modal + toast */
+#modal{position:fixed;inset:0;z-index:50;background:rgba(3,5,15,.6);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:24px}
+#modal.show{display:flex}
+.mbox{width:100%;max-width:380px;background:#141B3D;border:1px solid var(--line);border-radius:22px;padding:20px}
+.mbox h3{margin:0 0 8px;font-size:18px}
+.mbox p{margin:0 0 14px;color:var(--muted);font-size:14px;line-height:1.5}
+.mbox .inp{margin-bottom:16px}
+.mbtns{display:flex;gap:10px}
+.mbtns button{flex:1;height:46px;border-radius:14px;font-weight:700;background:rgba(255,255,255,.08);border:1px solid var(--line)}
+.mbtns .ok{background:linear-gradient(95deg,#FFD66B,#FF8A3D);color:#1B0E00;border:0}
+.mbtns .del{background:var(--danger);color:#fff;border:0}
+#toast{position:fixed;left:50%;top:calc(var(--st) + 110px);transform:translate(-50%,-20px);opacity:0;z-index:60;background:rgba(20,27,61,.95);border:1px solid var(--line);padding:11px 16px;border-radius:14px;font-size:13px;font-weight:500;transition:all .3s;pointer-events:none;max-width:88vw;text-align:center}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+.maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right{bottom:auto!important;top:calc(var(--st) + 104px)}
+.maplibregl-ctrl-attrib{font-size:9px!important;background:rgba(11,16,38,.6)!important;color:#aaa!important}
+.maplibregl-ctrl-attrib a{color:#ccc!important}
+.spinner{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(255,255,255,.25);border-top-color:var(--sun);animation:spin .8s linear infinite}
+</style>
+</head>
+<body>
+
+<!-- ============ SPLASH ============ -->
+<section id="splash" class="screen active">
+  <div id="stars"></div>
+  <div class="field"></div>
+  <div class="sunwrap">
+    <svg class="rays" viewBox="0 0 200 200" width="200" height="200">
+      <defs><linearGradient id="rg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE08A"/><stop offset="1" stop-color="#FF6B3D" stop-opacity="0"/></linearGradient></defs>
+      <g id="rayG"></g>
+    </svg>
+    <div class="sunCore"></div>
+  </div>
+  <div class="brand">
+    <h1>Solar<span>Scout</span></h1>
+    <p>Site assessment — from orbit to rooftop</p>
+  </div>
+  <div class="actions">
+    <button class="btn-primary" id="btnNew">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      New project
+    </button>
+    <button class="btn-ghost" id="btnOpen">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      Open project <span class="badge" id="projCount">0</span>
+    </button>
+  </div>
+  <div class="ver">v0.3 · Remote: location, roof, obstacles & parapets, layout</div>
+</section>
+
+<!-- ============ PROJECTS ============ -->
+<section id="projects" class="screen">
+  <div class="phead">
+    <button class="iconbtn" data-back="splash"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <h2>Projects</h2>
+  </div>
+  <div class="plist" id="plist"></div>
+</section>
+
+<!-- ============ MAP ============ -->
+<section id="mapScreen" class="screen">
+  <div id="map"></div>
+  <svg class="crosshair" id="crosshair" viewBox="0 0 36 36"><circle cx="18" cy="18" r="4" fill="none" stroke="#FFB020" stroke-width="2"/><path d="M18 2v9M18 25v9M2 18h9M25 18h9" stroke="#FFB020" stroke-width="2"/></svg>
+
+  <div class="topbar">
+    <button class="iconbtn" id="btnBack"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <form class="search" id="searchForm" autocomplete="off">
+      <input id="q" type="search" placeholder="Address, place or lat, lng" enterkeyhint="search">
+      <button type="submit" id="qBtn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
+    </form>
+    <button class="iconbtn" id="btnGps" title="Use my location"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+  </div>
+  <div id="results"></div>
+  <div class="steps" id="steps"></div>
+
+  <div id="summary"></div>
+
+  <div class="fabs" id="fabs">
+    <button class="fab" id="btnSave" title="Save"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 3h11l4 4v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 1-2z"/><path d="M8 3v5h8V3M8 21v-7h8v7"/></svg></button>
+    <button class="fab" id="btnPanels" title="Panels"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 5h16l-2 14H6z"/><path d="M5 10h14M5.6 14.5h12.8M10 5l-1 14M14 5l1 14"/></svg></button>
+    <button class="fab obs" id="btnObs" title="Add obstacle"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF5470" stroke-width="2" stroke-linejoin="round"><rect x="4" y="7" width="16" height="12" rx="1.5"/><path d="M8 7V4h8v3M9 11l6 5M15 11l-6 5"/></svg><span class="lbl" id="obsLbl">Obstacles</span></button>
+    <button class="fab main" id="btnDraw" title="Draw roof area"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1B0E00" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"><path d="M4 18l3-12 10 2 3 10z"/><circle cx="4" cy="18" r="1.6" fill="#1B0E00"/><circle cx="7" cy="6" r="1.6" fill="#1B0E00"/><circle cx="17" cy="8" r="1.6" fill="#1B0E00"/><circle cx="20" cy="18" r="1.6" fill="#1B0E00"/></svg><span class="lbl" id="drawLbl">Draw roof area</span></button>
+  </div>
+
+  <div id="drawBar">
+    <div class="info"><span id="drawHint">Tap each roof corner. Tap the first point to close.</span><b id="drawStat"></b></div>
+    <div class="btns">
+      <button id="dUndo">Undo</button>
+      <button id="dCancel">Cancel</button>
+      <button class="go" id="dFinish" disabled>Close shape</button>
+    </div>
+  </div>
+
+  <div id="sheet"></div>
+</section>
+
+<div id="modal"><div class="mbox" id="mbox"></div></div>
+<div id="toast"></div>
+<input type="file" id="fileIn" accept=".json,.csv,application/json,text/csv" hidden>
+
+<script>
+/* =====================================================================
+   SolarScout v0.1 — PV site assessment (location → roof area → layout)
+   Next steps planned: DC/AC cabling, stringing, inverter matching, export
+   ===================================================================== */
+
+// ---------------- Module database (starter set) ----------------
+// Values taken from manufacturer datasheets / distributor listings (Nov 2026).
+// Always verify against the current datasheet revision. Import your own DB with the button in the app.
+const PANEL_DB_DEFAULT = [
+  {id:'jinko-jkm580n-72hl4-v', manufacturer:'Jinko Solar', model:'Tiger Neo JKM580N-72HL4-V', tech:'N-type TOPCon · monofacial',
+   pmax:580, vmp:42.37, imp:13.69, voc:51.02, isc:14.47, eff:22.45, length:2278, width:1134, thickness:30, weight:null,
+   tcPmax:-0.29, tcVoc:-0.25, tcIsc:0.045, cells:144, vmax:1500},
+  {id:'longi-lr5-72hth-580m', manufacturer:'LONGi', model:'Hi-MO 6 Explorer LR5-72HTH-580M', tech:'HPBC · monofacial',
+   pmax:580, vmp:44.06, imp:13.17, voc:52.21, isc:14.20, eff:22.5, length:2278, width:1134, thickness:35, weight:27.5,
+   tcPmax:-0.29, tcVoc:-0.23, tcIsc:0.05, cells:144, vmax:1500},
+  {id:'trina-tsm-440neg9r28', manufacturer:'Trina Solar', model:'Vertex S+ TSM-440NEG9R.28', tech:'N-type i-TOPCon · dual glass',
+   pmax:440, vmp:44.0, imp:10.01, voc:52.2, isc:10.67, eff:22.0, length:1762, width:1134, thickness:30, weight:21,
+   tcPmax:-0.30, tcVoc:-0.24, tcIsc:0.04, cells:144, vmax:1500},
+];
+
+// ---------------- Storage ----------------
+const LS = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
+};
+const K_PROJ = 'solarscout.projects.v1', K_PANELS = 'solarscout.panels.v1';
+function allPanels(){
+  const user = LS.get(K_PANELS, []);
+  const map = new Map(PANEL_DB_DEFAULT.map(p => [p.id, p]));
+  user.forEach(p => map.set(p.id, {...p, user:true}));
+  return [...map.values()];
+}
+function panelById(id){ return allPanels().find(p => p.id === id) || PANEL_DB_DEFAULT[0]; }
+
+// ---------------- Utils ----------------
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Math.random().toString(36).slice(2, 10);
+const fmt = (n, d=1) => (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString('en-US', {maximumFractionDigits:d, minimumFractionDigits:d});
+let toastT;
+function toast(msg, ms=2600){ const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), ms); }
+function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === id)); }
+
+function modal({title, text='', input=null, ok='OK', cancel='Cancel', danger=false}){
+  return new Promise(res => {
+    const box = $('#mbox');
+    box.innerHTML = `<h3>${esc(title)}</h3>${text ? `<p>${esc(text)}</p>` : ''}
+      ${input !== null ? `<div class="inp"><input id="mIn" value="${esc(input)}"></div>` : ''}
+      <div class="mbtns">${cancel ? `<button id="mC">${esc(cancel)}</button>` : ''}<button id="mO" class="${danger ? 'del' : 'ok'}">${esc(ok)}</button></div>`;
+    $('#modal').classList.add('show');
+    const inp = $('#mIn'); if (inp) setTimeout(() => { inp.focus(); inp.select(); }, 50);
+    const close = v => { $('#modal').classList.remove('show'); res(v); };
+    $('#mO').onclick = () => close(inp ? inp.value.trim() : true);
+    if ($('#mC')) $('#mC').onclick = () => close(null);
+  });
+}
+
+// GEO-START ===========================================================
+// Local tangent-plane projection (metres) around an origin — accurate for roof/site scale
+function makeProj(o){
+  const lat0 = o[1] * Math.PI / 180;
+  const ky = 110574.0, kx = 111320.0 * Math.cos(lat0);
+  return {
+    fwd: p => [(p[0] - o[0]) * kx, (p[1] - o[1]) * ky],
+    inv: q => [o[0] + q[0] / kx, o[1] + q[1] / ky]
+  };
+}
+function centroid(ring){ let x=0, y=0; ring.forEach(p => { x += p[0]; y += p[1]; }); return [x / ring.length, y / ring.length]; }
+function areaM2(pts){ let a = 0; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) a += (pts[j][0] + pts[i][0]) * (pts[j][1] - pts[i][1]); return Math.abs(a / 2); }
+function perimeter(pts){ let s = 0; for (let i = 0; i < pts.length; i++){ const a = pts[i], b = pts[(i + 1) % pts.length]; s += Math.hypot(b[0] - a[0], b[1] - a[1]); } return s; }
+function pip(p, poly){
+  let ins = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++){
+    const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+    if (((yi > p[1]) !== (yj > p[1])) && (p[0] < (xj - xi) * (p[1] - yi) / (yj - yi) + xi)) ins = !ins;
+  }
+  return ins;
+}
+function distSeg(p, a, b){
+  const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy;
+  let t = L2 ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2 : 0; t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+}
+function segsCross(a, b, c, d){
+  const o = (p, q, r) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]));
+  return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0;
+}
+function selfIntersects(pts){
+  const n = pts.length;
+  for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++){
+    if (i === 0 && j === n - 1) continue;
+    if (segsCross(pts[i], pts[(i + 1) % n], pts[j], pts[(j + 1) % n])) return true;
+  }
+  return false;
+}
+function longestEdgeAngle(pts){
+  let best = 0, ang = 0;
+  for (let i = 0; i < pts.length; i++){
+    const a = pts[i], b = pts[(i + 1) % pts.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (L > best){ best = L; ang = Math.atan2(b[1] - a[1], b[0] - a[0]); }
+  }
+  return ang;
+}
+const D2R = Math.PI / 180;
+// Sun positions on the winter solstice, from (12 - win) h to (12 + win) h solar time, every 30 min
+function sunPositions(lat, win){
+  const phi = lat * D2R, dec = (lat >= 0 ? -23.45 : 23.45) * D2R, out = [];
+  for (let h = -win; h <= win + 1e-9; h += 0.5){
+    const H = h * 15 * D2R;
+    const el = Math.asin(Math.sin(phi) * Math.sin(dec) + Math.cos(phi) * Math.cos(dec) * Math.cos(H));
+    if (el < 5 * D2R) continue;
+    const azS = Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(phi) - Math.tan(dec) * Math.cos(phi));
+    out.push({ el, az: Math.PI + azS });           // az: compass, radians (0 = N, π/2 = E)
+  }
+  if (!out.length) out.push({ el: 10 * D2R, az: lat >= 0 ? Math.PI : 0 });
+  return out;
+}
+// Shadow length of height h, projected on compass direction dirAz (radians), worst case over the window
+function shadowAlong(h, suns, dirAz){
+  let m = 0;
+  for (const s of suns){ const L = h / Math.tan(s.el); m = Math.max(m, L * Math.cos((s.az + Math.PI) - dirAz)); }
+  return Math.max(0, m);
+}
+// Kept for the sheet placeholder (noon value)
+function autoRowGap(slopeDim, tiltRad, lat){
+  const elev = Math.max(10, 90 - Math.abs(lat) - 23.45) * D2R;
+  return slopeDim * Math.sin(tiltRad) / Math.tan(elev);
+}
+function convexHull(P){
+  const p = P.map(q => q.slice()).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (p.length < 3) return p;
+  const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  for (const q of p){ while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+  for (let i = p.length - 1; i >= 0; i--){ const q = p[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+  up.pop(); lo.pop(); return lo.concat(up);
+}
+// Minimum distance between two polygons (0 if they overlap)
+function polyDist(A, B){
+  for (const p of A) if (pip(p, B)) return 0;
+  for (const p of B) if (pip(p, A)) return 0;
+  for (let i = 0; i < A.length; i++) for (let j = 0; j < B.length; j++)
+    if (segsCross(A[i], A[(i + 1) % A.length], B[j], B[(j + 1) % B.length])) return 0;
+  let d = Infinity;
+  for (const p of A) for (let j = 0; j < B.length; j++) d = Math.min(d, distSeg(p, B[j], B[(j + 1) % B.length]));
+  for (const p of B) for (let i = 0; i < A.length; i++) d = Math.min(d, distSeg(p, A[i], A[(i + 1) % A.length]));
+  return d;
+}
+function bboxOf(pts){ const b = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity }; pts.forEach(p => { b.x0 = Math.min(b.x0, p[0]); b.x1 = Math.max(b.x1, p[0]); b.y0 = Math.min(b.y0, p[1]); b.y1 = Math.max(b.y1, p[1]); }); return b; }
+// Outward-normal compass azimuth (radians) of each edge of a local-metre polygon
+function edgeNormals(pts){
+  let s = 0; for (let i = 0; i < pts.length; i++){ const a = pts[i], b = pts[(i + 1) % pts.length]; s += a[0] * b[1] - b[0] * a[1]; }
+  return pts.map((a, i) => { const b = pts[(i + 1) % pts.length], dx = b[0] - a[0], dy = b[1] - a[1];
+    const n = s > 0 ? [dy, -dx] : [-dy, dx]; return Math.atan2(n[0], n[1]); });
+}
+// Obstacle exclusion zones in local metres: body (with clearance) + shadow hull over the no-shade window
+function obstacleZones(obstacles, P, suns){
+  const zones = [];
+  (obstacles || []).forEach(ob => {
+    const body = ob.ring.map(P.fwd);
+    zones.push({ pts: body, c: Math.max(0, Number(ob.clearance) || 0) });
+    const h = Number(ob.height) || 0;
+    if (h > 0){
+      const pts = body.slice();
+      suns.forEach(s => { const L = h / Math.tan(s.el), v = [-Math.sin(s.az) * L, -Math.cos(s.az) * L]; body.forEach(p => pts.push([p[0] + v[0], p[1] + v[1]])); });
+      zones.push({ pts: convexHull(pts), c: 0.02 });
+    }
+  });
+  return zones;
+}
+// One fill pass in the rotated frame (rows along +x). edges: [a, b, setback]; zones: obstacle polygons (rotated)
+function fillPass(rp, edges, vsb, bb, along, depth, gx, pitch, placed, clearY, zones, tries, step, tag){
+  const valid = (x0, y0, x1, y1) => {
+    for (const o of placed)
+      if (x0 < o.x1 + gx - 1e-9 && x1 > o.x0 - gx + 1e-9 && y0 < o.y1 + clearY - 1e-9 && y1 > o.y0 - clearY + 1e-9) return false;
+    const cs = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+    for (const p of cs){
+      if (!pip(p, rp)) return false;
+      for (const e of edges) if (e[2] > 0 && distSeg(p, e[0], e[1]) < e[2] - 1e-6) return false;
+    }
+    for (let j = 0; j < rp.length; j++){ const v = rp[j], m = vsb[j]; if (v[0] > x0 - m && v[0] < x1 + m && v[1] > y0 - m && v[1] < y1 + m) return false; }
+    for (const z of zones){
+      if (x1 < z.bb.x0 - z.c || x0 > z.bb.x1 + z.c || y1 < z.bb.y0 - z.c || y0 > z.bb.y1 + z.c) continue;
+      if (polyDist(cs, z.pts) < z.c - 1e-6 || (z.c === 0 && polyDist(cs, z.pts) === 0)) return false;
+    }
+    return true;
+  };
+  let best = [];
+  for (let t = 0; t < tries; t++){
+    const res = [];
+    let y = bb.minY + pitch * t / tries;
+    while (y + depth <= bb.maxY + 1e-9){
+      let x = bb.minX, n = 0;
+      while (x + along <= bb.maxX + 1e-9){
+        if (valid(x, y, x + along, y + depth)){ res.push({ x0: x, y0: y, x1: x + along, y1: y + depth, o: tag }); n++; x += along + gx; }
+        else x += step;
+      }
+      y += n ? pitch : Math.max(step * 2, 0.1);
+    }
+    if (res.length > best.length) best = res;
+  }
+  return best;
+}
+// Main layout engine
+// s: area settings; opts: { obstacles:[{ring,height,clearance}], shadeWin: hours either side of noon }
+function computeLayout(ring, panel, s, opts = {}){
+  const o = centroid(ring), P = makeProj(o);
+  const pts = ring.map(P.fwd);
+  const roofA = areaM2(pts);
+  const win = opts.shadeWin != null ? Number(opts.shadeWin) : 0;
+  const suns = sunPositions(o[1], win);
+  // per-edge setbacks: base + parapet shadow (inward) over the window
+  const base = Math.max(0, Number(s.setback) || 0);
+  const normals = edgeNormals(pts);
+  const parapets = s.parapets || [];
+  const edgeSb = pts.map((_, i) => { const h = Number(parapets[i]) || 0; return base + (h > 0 ? shadowAlong(h, suns, normals[i] + Math.PI) : 0); });
+  const zonesLocal = obstacleZones(opts.obstacles, P, suns);
+  // candidate row directions
+  let angles = [];
+  if (s.align === 'ew') angles = [0];
+  else if (s.align === 'custom') angles = [(90 - (Number(s.customBearing) || 0)) * D2R];
+  else {
+    const eds = pts.map((a, i) => { const b = pts[(i + 1) % pts.length]; return { L: Math.hypot(b[0] - a[0], b[1] - a[1]), a: Math.atan2(b[1] - a[1], b[0] - a[0]) }; });
+    const maxL = Math.max(...eds.map(e => e.L));
+    eds.filter(e => e.L >= 0.25 * maxL).sort((p, q) => q.L - p.L).forEach(e => {
+      const norm = ((e.a % Math.PI) + Math.PI) % Math.PI;
+      if (!angles.some(a => { const d = Math.abs(a - norm); return Math.min(d, Math.PI - d) < 2 * D2R; })) angles.push(norm);
+    });
+    angles = angles.slice(0, 6);
+  }
+  // Tilted rows must face the equator: keep only directions within 30° of East–West
+  if (s.mount === 'tilted' && s.align !== 'custom'){
+    const ok = angles.filter(a => { const d = Math.abs(((a % Math.PI) + Math.PI) % Math.PI); return Math.min(d, Math.PI - d) <= 30 * D2R; });
+    angles = ok.length ? ok : [0];
+  }
+  const Lm = panel.length / 1000, Wm = panel.width / 1000;
+  const tilt = s.mount === 'tilted' ? (Number(s.tilt) || 0) * D2R : 0;
+  const gx = Math.max(0, Number(s.gap) || 0);
+  const customGap = (s.mount === 'tilted' && s.rowGap !== '' && s.rowGap != null) ? Math.max(0, Number(s.rowGap)) : null;
+  const primaries = s.orientation === 'auto' ? ['portrait', 'landscape'] : [s.orientation === 'landscape' ? 'landscape' : 'portrait'];
+  const fillGaps = s.fillGaps !== false;
+  const big = roofA >= 3000, huge = roofA >= 30000;
+  const tries = huge ? 2 : big ? 4 : 8, step = big ? 0.1 : 0.05;
+  let best = null;
+  for (const ang of angles){
+    // modules face the equator-side perpendicular of the rows
+    const rowBear = Math.PI / 2 - ang, eq = o[1] >= 0 ? Math.PI : 0;
+    const cand = [rowBear + Math.PI / 2, rowBear - Math.PI / 2];
+    const angd = a => { const d = Math.abs(((a - eq) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI); return d; };
+    const faceAz = angd(cand[0]) <= angd(cand[1]) ? cand[0] : cand[1];
+    const dims = orient => {
+      const along = orient === 'landscape' ? Lm : Wm, slope = orient === 'landscape' ? Wm : Lm;
+      const depth = slope * Math.cos(tilt);
+      const autoGap = s.mount === 'tilted' ? shadowAlong(slope * Math.sin(tilt), suns, faceAz + Math.PI) : gx;
+      const rowGap = customGap != null ? customGap : Math.max(autoGap, gx);
+      return { along, depth, rowGap, autoGap, pitch: depth + rowGap, tag: orient === 'landscape' ? 'L' : 'P' };
+    };
+    const c = Math.cos(-ang), sn = Math.sin(-ang);
+    const rot = ([x, y]) => [x * c - y * sn, x * sn + y * c];
+    const rp = pts.map(rot);
+    const edges = rp.map((p, i) => [p, rp[(i + 1) % rp.length], edgeSb[i]]);
+    const vsb = rp.map((_, j) => Math.max(edgeSb[j], edgeSb[(j - 1 + rp.length) % rp.length]));
+    const zones = zonesLocal.map(z => { const zp = z.pts.map(rot); return { pts: zp, c: z.c, bb: bboxOf(zp) }; });
+    const b = bboxOf(rp), bb = { minX: b.x0, maxX: b.x1, minY: b.y0, maxY: b.y1 };
+    for (const pri of primaries){
+      const A = dims(pri), B = dims(pri === 'portrait' ? 'landscape' : 'portrait');
+      const r1 = fillPass(rp, edges, vsb, bb, A.along, A.depth, gx, A.pitch, [], 0, zones, tries, step, A.tag);
+      const r2 = fillGaps ? fillPass(rp, edges, vsb, bb, B.along, B.depth, gx, B.pitch, r1, Math.max(A.rowGap, B.rowGap), zones, huge ? 1 : 4, step, B.tag) : [];
+      const all = r1.concat(r2);
+      if (!best || all.length > best.rects.length || (all.length === best.rects.length && r2.length < best.nSec))
+        best = { ang, rects: all, nSec: r2.length, A, pri };
+    }
+  }
+  const ang = best.ang, cb = Math.cos(ang), sb2 = Math.sin(ang);
+  const back = ([x, y]) => P.inv([x * cb - y * sb2, x * sb2 + y * cb]);
+  const r7 = v => Math.round(v * 1e7) / 1e7;
+  const modules = best.rects.map(r => [[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]].map(q => back(q).map(r7)));
+  const orients = best.rects.map(r => r.o);
+  const n = modules.length, nL = orients.filter(t => t === 'L').length;
+  return {
+    modules, orients,
+    stats: {
+      count: n, portrait: n - nL, landscape: nL, primary: best.pri,
+      kwp: n * panel.pmax / 1000, roofArea: roofA,
+      moduleArea: n * Lm * Wm,
+      weight: panel.weight ? n * panel.weight : null,
+      rowBearing: ((90 - ang * 180 / Math.PI) % 180 + 180) % 180,
+      autoRowGap: best.A.autoGap, pitch: best.A.pitch, directionsTried: angles.length,
+      edgeSetbacks: edgeSb, obstacles: (opts.obstacles || []).length
+    }
+  };
+}
+// Shadow hull of one obstacle, in lng/lat, for display
+function obstacleShadowLL(ob, lat, win){
+  const h = Number(ob.height) || 0; if (h <= 0) return null;
+  const P = makeProj(centroid(ob.ring)), body = ob.ring.map(P.fwd), pts = body.slice();
+  sunPositions(lat, win).forEach(s => { const L = h / Math.tan(s.el), v = [-Math.sin(s.az) * L, -Math.cos(s.az) * L]; body.forEach(p => pts.push([p[0] + v[0], p[1] + v[1]])); });
+  return convexHull(pts).map(P.inv);
+}
+function compass(rad){ const d = ((rad * 180 / Math.PI) % 360 + 360) % 360; return ['N','NE','E','SE','S','SW','W','NW'][Math.round(d / 45) % 8]; }
+// GEO-END =============================================================
+
+// ---------------- App state ----------------
+let project = null, dirty = false, selectedAreaId = null;
+let mode = 'idle'; // 'idle' | 'draw'
+let drawTarget = 'roof'; // 'roof' | 'obstacle'
+let selectedObsId = null;
+let draft = [];
+let map = null, mapReady = false, spinning = false, locMarker = null, edgeMarkers = [];
+
+function newProject(){
+  return { id: uid(), name: '', mode: 'remote', createdAt: Date.now(), updatedAt: Date.now(), location: null, camera: null, areas: [], obstacles: [], shadeWin: 2 };
+}
+function defaultSettings(){
+  const last = LS.get('solarscout.lastSettings', null);
+  return Object.assign({ panelId: PANEL_DB_DEFAULT[0].id, orientation: 'portrait', mount: 'flush', tilt: 15, rowGap: '', setback: 0.5, gap: 0.02, align: 'edge', customBearing: 90 }, last || {});
+}
+function areaById(id){ return project?.areas.find(a => a.id === id); }
+function obsById(id){ return project?.obstacles?.find(o => o.id === id); }
+const OBS_TYPES = [
+  { k: 'tank',  n: 'Water tank',          i: '🛢️', h: 1.5, c: 0.5 },
+  { k: 'swh',   n: 'Solar water heater',  i: '♨️', h: 1.6, c: 0.5 },
+  { k: 'hvac',  n: 'AC / HVAC unit',      i: '❄️', h: 1.2, c: 0.6 },
+  { k: 'stair', n: 'Stair / lift room',   i: '🚪', h: 2.6, c: 0.5 },
+  { k: 'wall',  n: 'Wall / parapet',      i: '🧱', h: 1.0, c: 0.3 },
+  { k: 'chim',  n: 'Chimney / vent',      i: '🏭', h: 1.0, c: 0.4 },
+  { k: 'sky',   n: 'Skylight / hatch',    i: '🪟', h: 0.3, c: 0.4 },
+  { k: 'other', n: 'No-go zone',          i: '⛔', h: 0,   c: 0.3 }
+];
+const obsType = k => OBS_TYPES.find(t => t.k === k) || OBS_TYPES[OBS_TYPES.length - 1];
+const WIN_LABEL = { 0: 'noon', 2: '10:00–14:00', 3: '9:00–15:00' };
+function markDirty(){ dirty = true; if (project.name) autosave(); }
+
+// ---------------- Splash ----------------
+(function buildSplash(){
+  const g = document.getElementById('rayG');
+  for (let i = 0; i < 16; i++){
+    const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    r.setAttribute('x', 97); r.setAttribute('y', i % 2 ? 14 : 4); r.setAttribute('width', 6); r.setAttribute('height', i % 2 ? 26 : 36); r.setAttribute('rx', 3);
+    r.setAttribute('fill', 'url(#rg)'); r.setAttribute('transform', `rotate(${i * 22.5} 100 100)`); g.appendChild(r);
+  }
+  const st = document.getElementById('stars');
+  for (let i = 0; i < 60; i++){
+    const s = document.createElement('div'); s.className = 'star';
+    s.style.left = Math.random() * 100 + '%'; s.style.top = Math.random() * 55 + '%';
+    s.style.animationDelay = (Math.random() * 3) + 's'; s.style.opacity = Math.random();
+    if (Math.random() < .2){ s.style.width = s.style.height = '3px'; }
+    st.appendChild(s);
+  }
+  // Home-screen icon generated on the fly
+  try{
+    const cv = document.createElement('canvas'); cv.width = cv.height = 180; const x = cv.getContext('2d');
+    const gr = x.createLinearGradient(0, 0, 0, 180); gr.addColorStop(0, '#1A1A4E'); gr.addColorStop(1, '#D9406F'); x.fillStyle = gr; x.fillRect(0, 0, 180, 180);
+    const sg = x.createRadialGradient(80, 70, 4, 90, 80, 46); sg.addColorStop(0, '#FFF3C4'); sg.addColorStop(.5, '#FFB020'); sg.addColorStop(1, '#FF6B3D');
+    x.fillStyle = sg; x.beginPath(); x.arc(90, 78, 40, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#22357E'; x.strokeStyle = '#9fc2ff'; x.lineWidth = 2;
+    for (let i = 0; i < 4; i++){ x.fillRect(22 + i * 35, 128, 32, 34); x.strokeRect(22 + i * 35, 128, 32, 34); }
+    document.getElementById('touchIcon').href = cv.toDataURL('image/png');
+  }catch(e){}
+  refreshCount();
+})();
+function refreshCount(){ $('#projCount').textContent = LS.get(K_PROJ, []).length; }
+
+$('#btnNew').onclick = () => {
+  const box = $('#mbox');
+  box.innerHTML = `<h3>New site assessment</h3><p>How are you assessing this site?</p>
+    <button class="modeCard" id="mRemote"><div class="ic">🛰️</div><div><b>Remote</b><small>From satellite imagery: outline roofs, obstacles and parapets, auto-layout modules.</small></div></button>
+    <button class="modeCard off" id="mLive"><div class="ic">📍</div><div><b>On site (live) <span class="soon">SOON</span></b><small>Walk the roof: GPS corners, photos, compass, tape measurements and notes.</small></div></button>
+    <div class="mbtns"><button id="mC">Cancel</button></div>`;
+  $('#modal').classList.add('show');
+  $('#mC').onclick = () => $('#modal').classList.remove('show');
+  $('#mLive').onclick = () => toast('On-site mode is the next big module — coming soon');
+  $('#mRemote').onclick = () => { $('#modal').classList.remove('show'); project = newProject(); dirty = false; selectedAreaId = null; selectedObsId = null; openMap(true); };
+};
+$('#btnOpen').onclick = () => { renderProjects(); show('projects'); };
+document.querySelectorAll('[data-back]').forEach(b => b.onclick = () => { refreshCount(); show(b.dataset.back); });
+
+// ---------------- Projects list ----------------
+function renderProjects(){
+  const list = LS.get(K_PROJ, []).sort((a, b) => b.updatedAt - a.updatedAt);
+  const el = $('#plist');
+  if (!list.length){ el.innerHTML = `<div class="empty">No saved projects yet.<br><br>Create one from the home screen.</div>`; return; }
+  el.innerHTML = list.map(p => {
+    const n = p.areas.reduce((s, a) => s + (a.modules?.length || 0), 0);
+    const kwp = p.areas.reduce((s, a) => s + (a.stats?.kwp || 0), 0);
+    return `<div class="pcard" data-id="${p.id}">
+      <div class="pthumb"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1B0E00" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16l-2 14H6z"/><path d="M5 10h14M5.6 14.5h12.8M10 5l-1 14M14 5l1 14"/></svg></div>
+      <div class="pinfo"><b>${esc(p.name)}</b><small>${esc(p.location?.label || 'No location')}</small><small>${p.areas.length} area(s) · ${n} modules · ${fmt(kwp, 2)} kWp · ${new Date(p.updatedAt).toLocaleDateString()}</small></div>
+      <button class="iconbtn" data-del="${p.id}" style="width:40px;height:40px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF5470" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.pcard').forEach(c => c.onclick = async e => {
+    const del = e.target.closest('[data-del]');
+    if (del){
+      e.stopPropagation();
+      const okDel = await modal({ title: 'Delete project?', text: 'This removes it from this device.', ok: 'Delete', danger: true });
+      if (okDel){ LS.set(K_PROJ, LS.get(K_PROJ, []).filter(p => p.id !== del.dataset.del)); renderProjects(); refreshCount(); }
+      return;
+    }
+    project = LS.get(K_PROJ, []).find(p => p.id === c.dataset.id); dirty = false; selectedAreaId = null;
+    openMap(false);
+  });
+}
+function saveProject(){
+  project.updatedAt = Date.now();
+  if (map) { const cc = map.getCenter(); project.camera = { center: [cc.lng, cc.lat], zoom: map.getZoom(), bearing: map.getBearing() }; }
+  const list = LS.get(K_PROJ, []).filter(p => p.id !== project.id); list.push(project);
+  const ok = LS.set(K_PROJ, list); dirty = !ok; return ok;
+}
+let saveT; function autosave(){ clearTimeout(saveT); saveT = setTimeout(saveProject, 600); }
+
+// ---------------- Map ----------------
+function buildMap(){
+  map = new maplibregl.Map({
+    container: 'map',
+    style: {
+      version: 8,
+      sources: {
+        sat: { type: 'raster', tileSize: 256, maxzoom: 19,
+          tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+          attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' },
+        labels: { type: 'raster', tileSize: 256, maxzoom: 19,
+          tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'] }
+      },
+      layers: [
+        { id: 'bg', type: 'background', paint: { 'background-color': '#05070f' } },
+        { id: 'sat', type: 'raster', source: 'sat' },
+        { id: 'labels', type: 'raster', source: 'labels', paint: { 'raster-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.9, 16, 0.0] } }
+      ]
+    },
+    center: [25, 28], zoom: 1.4, maxZoom: 22, attributionControl: { compact: true },
+    pitchWithRotate: false
+  });
+  map.touchPitch && map.touchPitch.disable();
+  map.on('style.load', () => {
+    try { map.setProjection({ type: 'globe' }); } catch(e){}
+    try { map.setSky({ 'sky-color': '#0B1026', 'horizon-color': '#4B5BC8', 'fog-color': '#0B1026', 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0] }); } catch(e){}
+  });
+  map.on('load', () => {
+    const empty = { type: 'FeatureCollection', features: [] };
+    ['areas', 'modules', 'draft', 'obstacles', 'obsShade', 'parapets'].forEach(s => map.addSource(s, { type: 'geojson', data: empty }));
+    map.addLayer({ id: 'areas-fill', type: 'fill', source: 'areas', paint: { 'fill-color': ['case', ['get', 'sel'], 'rgba(255,176,32,0.20)', 'rgba(46,230,168,0.14)'] } });
+    map.addLayer({ id: 'modules-fill', type: 'fill', source: 'modules', paint: { 'fill-color': ['case', ['==', ['get', 'o'], 'L'], '#2B5BD7', '#1C3FAA'], 'fill-opacity': 0.93 } });
+    map.addLayer({ id: 'modules-line', type: 'line', source: 'modules', paint: { 'line-color': '#A9C8FF', 'line-width': ['interpolate', ['linear'], ['zoom'], 17, 0.3, 21, 1.4] } });
+    map.addLayer({ id: 'obs-shade', type: 'fill', source: 'obsShade', paint: { 'fill-color': 'rgba(0,0,0,0.38)' } });
+    map.addLayer({ id: 'obs-fill', type: 'fill', source: 'obstacles', paint: { 'fill-color': ['case', ['get', 'sel'], 'rgba(255,84,112,0.65)', 'rgba(255,84,112,0.42)'] } });
+    map.addLayer({ id: 'obs-line', type: 'line', source: 'obstacles', paint: { 'line-color': '#FF5470', 'line-width': ['case', ['get', 'sel'], 3, 2] } });
+    map.addLayer({ id: 'parapets', type: 'line', source: 'parapets', paint: { 'line-color': '#C7B6FF', 'line-width': 7, 'line-opacity': 0.85 } });
+    map.addLayer({ id: 'areas-line', type: 'line', source: 'areas', paint: { 'line-color': ['case', ['get', 'sel'], '#FFB020', '#2EE6A8'], 'line-width': 2.5 } });
+    map.addLayer({ id: 'draft-fill', type: 'fill', source: 'draft', filter: ['==', '$type', 'Polygon'], paint: { 'fill-color': 'rgba(255,176,32,0.18)' } });
+    map.addLayer({ id: 'draft-line', type: 'line', source: 'draft', filter: ['==', '$type', 'LineString'], paint: { 'line-color': '#FFB020', 'line-width': 3, 'line-dasharray': [2, 1] } });
+    map.addLayer({ id: 'draft-pts', type: 'circle', source: 'draft', filter: ['==', '$type', 'Point'],
+      paint: { 'circle-radius': ['case', ['get', 'first'], 10, 7], 'circle-color': ['case', ['get', 'first'], '#FFB020', '#ffffff'], 'circle-stroke-color': '#FF6B3D', 'circle-stroke-width': 2.5 } });
+    mapReady = true;
+    renderAll();
+  });
+  map.on('click', onMapClick);
+  const stop = () => { spinning = false; };
+  map.on('mousedown', stop); map.on('touchstart', stop); map.on('wheel', stop);
+  map.on('moveend', () => { if (project && project.location) { const cc = map.getCenter(); project.camera = { center: [cc.lng, cc.lat], zoom: map.getZoom(), bearing: map.getBearing() }; } });
+}
+function spin(){
+  if (!spinning || !map) return;
+  if (map.getZoom() < 3){ const c = map.getCenter(); map.setCenter([c.lng + 0.12, c.lat]); }
+  requestAnimationFrame(spin);
+}
+function openMap(isNew){
+  project.obstacles = project.obstacles || []; if (project.shadeWin == null) project.shadeWin = 0; project.mode = project.mode || 'remote';
+  show('mapScreen'); closeSheet(); exitDraw(true); selectedObsId = null;
+  $('#q').value = ''; $('#results').style.display = 'none';
+  if (!map) buildMap(); else { map.resize(); }
+  if (locMarker){ locMarker.remove(); locMarker = null; }
+  if (isNew || !project.camera){
+    map.jumpTo({ center: [25, 28], zoom: 1.4, bearing: 0 });
+    spinning = true; requestAnimationFrame(spin);
+    setTimeout(() => toast('Search an address or tap ◎ to use your location'), 600);
+  } else {
+    spinning = false;
+    map.jumpTo({ center: project.camera.center, zoom: project.camera.zoom, bearing: project.camera.bearing || 0 });
+  }
+  if (project.location) placePin(project.location);
+  renderAll();
+}
+function placePin(loc){
+  if (locMarker) locMarker.remove();
+  const el = document.createElement('div'); el.className = 'pin';
+  locMarker = new maplibregl.Marker({ element: el }).setLngLat([loc.lng, loc.lat]).addTo(map);
+}
+function goTo(lng, lat, label){
+  spinning = false;
+  project.location = { lng, lat, label }; markDirty();
+  placePin(project.location);
+  $('#results').style.display = 'none'; $('#q').blur();
+  map.flyTo({ center: [lng, lat], zoom: 19.3, bearing: 0, speed: 1.3, curve: 1.5, essential: true });
+  map.once('moveend', () => { if (locMarker && map.getZoom() > 17) { /* keep pin subtle at roof scale */ locMarker.getElement().style.opacity = '.55'; } toast('Tap ✏️ to outline the roof area'); });
+  renderSteps();
+}
+
+// ---------------- Search & GPS ----------------
+$('#searchForm').onsubmit = async e => {
+  e.preventDefault();
+  const q = $('#q').value.trim(); if (!q) return;
+  const m = q.match(/^\s*(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)\s*$/);
+  if (m){ const lat = +m[1], lng = +m[2]; if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return goTo(lng, lat, `${lat.toFixed(5)}, ${lng.toFixed(5)}`); }
+  const box = $('#results'); box.style.display = 'block'; box.innerHTML = `<div style="display:flex;gap:10px;align-items:center"><span class="spinner"></span> Searching…</div>`;
+  try{
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&addressdetails=0&q=${encodeURIComponent(q)}`, { headers: { 'Accept-Language': navigator.language || 'en' } });
+    const js = await r.json();
+    if (!js.length){ box.innerHTML = `<div>No results. Try “street, city” or paste coordinates.</div>`; return; }
+    box.innerHTML = js.map((x, i) => { const parts = x.display_name.split(','); return `<div data-i="${i}">${esc(parts.slice(0, 2).join(','))}<small>${esc(parts.slice(2).join(',').trim())}</small></div>`; }).join('');
+    box.querySelectorAll('[data-i]').forEach(d => d.onclick = () => { const x = js[+d.dataset.i]; goTo(+x.lon, +x.lat, x.display_name.split(',').slice(0, 3).join(',')); });
+  }catch(err){ box.innerHTML = `<div>Search unavailable (offline?). You can paste coordinates: 33.8547, 35.5370</div>`; }
+};
+$('#btnGps').onclick = () => {
+  if (!navigator.geolocation) return toast('Location not supported on this device');
+  toast('Getting your location…');
+  navigator.geolocation.getCurrentPosition(
+    p => goTo(p.coords.longitude, p.coords.latitude, `My location (${p.coords.latitude.toFixed(5)}, ${p.coords.longitude.toFixed(5)})`),
+    err => toast(err.code === 1 ? 'Location permission denied — search instead' : 'Could not get location'),
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
+  );
+};
+
+// ---------------- Steps bar ----------------
+function renderSteps(){
+  const hasLoc = !!project?.location, hasArea = project?.areas.length > 0, hasMods = project?.areas.some(a => a.modules?.length);
+  const st = [
+    { n: 1, t: 'Location', done: hasLoc, active: !hasLoc },
+    { n: 2, t: 'Roof area', done: hasArea, active: hasLoc && !hasArea },
+    { n: 3, t: 'Obstacles', done: (project?.obstacles || []).length > 0, active: false },
+    { n: 4, t: 'Panels', done: hasMods, active: hasArea && !hasMods },
+    { n: 5, t: 'DC/AC cabling', locked: true }
+  ];
+  $('#steps').innerHTML = st.map(s => `<button class="chip ${s.done ? 'done' : ''} ${s.active ? 'active' : ''} ${s.locked ? 'locked' : ''}" data-step="${s.n}"><i>${s.done ? '✓' : s.locked ? '🔒' : s.n}</i>${s.t}</button>`).join('');
+  $('#steps').querySelectorAll('.chip').forEach(c => c.onclick = () => {
+    const n = +c.dataset.step;
+    if (n === 1) $('#q').focus();
+    if (n === 2) startDraw('roof');
+    if (n === 3) startDraw('obstacle');
+    if (n === 4) openPanels();
+    if (n === 5) toast('DC/AC cabling — coming in the next development step');
+  });
+}
+
+// ---------------- Rendering ----------------
+function ringClosed(r){ return [...r, r[0]]; }
+function renderAll(){
+  renderSteps(); renderSummary();
+  $('#drawLbl').style.display = project && project.areas.length ? 'none' : '';
+  if (!mapReady || !project) return;
+  map.getSource('areas').setData({ type: 'FeatureCollection', features: project.areas.map(a => ({ type: 'Feature', properties: { id: a.id, sel: a.id === selectedAreaId }, geometry: { type: 'Polygon', coordinates: [ringClosed(a.ring)] } })) });
+  const mods = [];
+  project.areas.forEach(a => (a.modules || []).forEach((m, i) => mods.push({ type: 'Feature', properties: { areaId: a.id, o: (a.orients || [])[i] || 'P' }, geometry: { type: 'Polygon', coordinates: [ringClosed(m)] } })));
+  map.getSource('modules').setData({ type: 'FeatureCollection', features: mods });
+  const obs = project.obstacles || [];
+  map.getSource('obstacles').setData({ type: 'FeatureCollection', features: obs.map(o => ({ type: 'Feature', properties: { id: o.id, sel: o.id === selectedObsId }, geometry: { type: 'Polygon', coordinates: [ringClosed(o.ring)] } })) });
+  map.getSource('obsShade').setData({ type: 'FeatureCollection', features: obs.map(o => { const r = obstacleShadowLL(o, o.ring[0][1], project.shadeWin || 0); return r ? { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ringClosed(r)] } } : null; }).filter(Boolean) });
+  const par = [];
+  project.areas.forEach(a => (a.settings.parapets || []).forEach((hh, i) => { if (Number(hh) > 0 && i < a.ring.length) par.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [a.ring[i], a.ring[(i + 1) % a.ring.length]] } }); }));
+  map.getSource('parapets').setData({ type: 'FeatureCollection', features: par });
+  renderDraft();
+  const sel = areaById(selectedAreaId);
+  if (mode !== 'draw') renderEdgeLabels(sel ? sel.ring : [], true, !!sel);
+  $('#obsLbl').style.display = project.areas.length && !(project.obstacles || []).length ? '' : 'none';
+}
+function renderDraft(){
+  if (!mapReady) return;
+  const f = [];
+  if (draft.length >= 3) f.push({ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ringClosed(draft)] } });
+  if (draft.length >= 2) f.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: draft } });
+  draft.forEach((p, i) => f.push({ type: 'Feature', properties: { first: i === 0 && draft.length >= 3 }, geometry: { type: 'Point', coordinates: p } }));
+  map.getSource('draft').setData({ type: 'FeatureCollection', features: f });
+}
+function renderEdgeLabels(ring, closed, numbered){
+  edgeMarkers.forEach(m => m.remove()); edgeMarkers = [];
+  if (!ring || ring.length < 2) return;
+  const P = makeProj(centroid(ring)), pts = ring.map(P.fwd);
+  const n = closed ? ring.length : ring.length - 1;
+  for (let i = 0; i < n; i++){
+    const a = pts[i], b = pts[(i + 1) % ring.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (L < 0.5) continue;
+    const mid = P.inv([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
+    const el = document.createElement('div'); el.className = 'edgeLbl'; el.textContent = (numbered ? 'E' + (i + 1) + ' · ' : '') + L.toFixed(1) + ' m';
+    edgeMarkers.push(new maplibregl.Marker({ element: el }).setLngLat(mid).addTo(map));
+  }
+}
+function renderSummary(){
+  const el = $('#summary');
+  if (!project || !project.areas.some(a => a.modules?.length) || mode === 'draw' || $('#sheet').classList.contains('open')){ el.style.display = 'none'; return; }
+  const n = project.areas.reduce((s, a) => s + (a.modules?.length || 0), 0);
+  const kwp = project.areas.reduce((s, a) => s + (a.stats?.kwp || 0), 0);
+  const ar = project.areas.reduce((s, a) => s + (a.stats?.roofArea || 0), 0);
+  el.style.display = 'block';
+  el.innerHTML = `<div class="row"><div><div class="k">${n}</div><div class="l">modules</div></div><div><div class="k">${fmt(kwp, 2)}<small>kWp</small></div><div class="l">DC peak</div></div><div><div class="k">${fmt(ar, 0)}<small>m²</small></div><div class="l">${project.areas.length} area(s) · ${(project.obstacles || []).length} obst.</div></div></div>`;
+}
+
+// ---------------- Drawing ----------------
+$('#btnDraw').onclick = () => mode === 'draw' ? finishDraw() : startDraw('roof');
+$('#btnObs').onclick = () => startDraw('obstacle');
+function startDraw(target){
+  drawTarget = target || 'roof';
+  if (drawTarget === 'obstacle' && !project.areas.length){ toast('Outline the roof first, then add obstacles'); return; }
+  if (!project.location && map.getZoom() < 15){ toast('First find the site: search or use your location'); $('#q').focus(); return; }
+  if (map.getZoom() < 16.5) toast('Tip: zoom in closer for accurate corners');
+  closeSheet(); mode = 'draw'; draft = []; selectedAreaId = null; selectedObsId = null;
+  $('#drawBar').style.borderColor = drawTarget === 'obstacle' ? 'rgba(255,84,112,.7)' : 'rgba(255,176,32,.5)';
+  map.doubleClickZoom.disable();
+  $('#drawBar').style.display = 'block'; $('#fabs').style.display = 'none'; $('#summary').style.display = 'none';
+  updateDrawBar(); renderAll();
+}
+function exitDraw(silent){
+  mode = 'idle'; draft = [];
+  if (map){ map.doubleClickZoom.enable(); }
+  $('#drawBar').style.display = 'none'; $('#fabs').style.display = 'flex';
+  if (!silent) renderAll();
+}
+function updateDrawBar(){
+  let stat = `${draft.length} pts`;
+  if (draft.length >= 3){ const P = makeProj(centroid(draft)); stat += ` · ${fmt(areaM2(draft.map(P.fwd)), 1)} m²`; }
+  $('#drawStat').textContent = stat;
+  $('#dFinish').disabled = draft.length < 3; $('#dUndo').disabled = !draft.length;
+  $('#drawHint').textContent = draft.length < 3 ? (drawTarget === 'obstacle' ? 'Obstacle: tap its corners (tank, AC, stairs…)' : 'Tap each roof corner on the image.') : 'Tap the first point (orange) or “Close shape”.';
+  renderDraft(); renderEdgeLabels(draft, false);
+}
+function onMapClick(e){
+  if (mode === 'draw'){
+    if (draft.length >= 3){
+      const p0 = map.project(draft[0]);
+      if (Math.hypot(p0.x - e.point.x, p0.y - e.point.y) < 26) return finishDraw();
+    }
+    draft.push([e.lngLat.lng, e.lngLat.lat]);
+    if (navigator.vibrate) try{ navigator.vibrate(8); }catch(_){}
+    updateDrawBar(); return;
+  }
+  const fo = map.queryRenderedFeatures(e.point, { layers: ['obs-fill'] });
+  if (fo.length){ openObstacle(fo[0].properties.id); return; }
+  const f = map.queryRenderedFeatures(e.point, { layers: ['modules-fill', 'areas-fill'] });
+  if (f.length){ selectedObsId = null; selectedAreaId = f[0].properties.areaId || f[0].properties.id; renderAll(); openPanels(); }
+  else if (selectedAreaId || selectedObsId){ selectedAreaId = null; selectedObsId = null; closeSheet(); renderAll(); }
+}
+$('#dUndo').onclick = () => { draft.pop(); updateDrawBar(); };
+$('#dCancel').onclick = () => exitDraw();
+$('#dFinish').onclick = () => finishDraw();
+function finishDraw(){
+  if (draft.length < 3) return toast('Need at least 3 corners');
+  const P = makeProj(centroid(draft)), pts = draft.map(P.fwd);
+  if (selfIntersects(pts)) return toast('Edges cross each other — undo and fix the shape');
+  if (drawTarget === 'obstacle'){
+    if (areaM2(pts) < 0.05) return toast('Obstacle too small');
+    const t = OBS_TYPES[0];
+    const ob = { id: uid(), type: t.k, ring: draft.slice(), height: t.h, clearance: t.c };
+    project.obstacles.push(ob); selectedObsId = ob.id;
+    exitDraw(true); markDirty(); relayoutAll(); renderAll(); openObstacle(ob.id);
+    return;
+  }
+  if (areaM2(pts) < 2) return toast('Area too small');
+  const area = { id: uid(), name: 'Area ' + (project.areas.length + 1), ring: draft.slice(), settings: defaultSettings(), modules: [], stats: null };
+  project.areas.push(area); selectedAreaId = area.id;
+  exitDraw(true); markDirty(); renderAll();
+  toast(`${area.name}: ${fmt(areaM2(pts), 1)} m² — now choose the module`);
+  setTimeout(openPanels, 350);
+}
+
+// ---------------- Panels & layout sheet ----------------
+$('#btnPanels').onclick = () => openPanels();
+function openPanels(){
+  if (!project.areas.length){ toast('Draw a roof area first'); return; }
+  selectedObsId = null;
+  if (!areaById(selectedAreaId)) selectedAreaId = project.areas[project.areas.length - 1].id;
+  renderSheet(); $('#sheet').classList.add('open'); renderAll();
+}
+function closeSheet(){ $('#sheet').classList.remove('open'); if (selectedObsId){ selectedObsId = null; if (mapReady) renderAll(); } renderSummary(); }
+function seg(key, opts, val){ return `<div class="seg" data-seg="${key}">${opts.map(([v, t]) => `<button data-v="${v}" class="${v === val ? 'on' : ''}">${t}</button>`).join('')}</div>`; }
+function num(key, val, unit, ph=''){ return `<div class="inp"><input inputmode="decimal" data-num="${key}" value="${val ?? ''}" placeholder="${ph}"><span>${unit}</span></div>`; }
+function renderSheet(keepScroll){
+  const sh = $('#sheet'), top = sh.scrollTop;
+  const a = areaById(selectedAreaId); if (!a) return;
+  const s = a.settings, pnl = panelById(s.panelId);
+  const P = makeProj(centroid(a.ring)), pts = a.ring.map(P.fwd);
+  const A = areaM2(pts), per = perimeter(pts);
+  const others = project.areas.length > 1 ? `<div class="seg" style="margin:10px 0 0" id="areaTabs">${project.areas.map(x => `<button data-a="${x.id}" class="${x.id === a.id ? 'on' : ''}">${esc(x.name)}</button>`).join('')}</div>` : '';
+  const mods = allPanels().map(p => `
+    <div class="mod ${p.id === s.panelId ? 'sel' : ''}" data-pid="${esc(p.id)}">
+      <div class="top"><div class="radio"></div><div class="nm"><b>${esc(p.model)}</b><small>${esc(p.manufacturer)}${p.tech ? ' · ' + esc(p.tech) : ''}${p.user ? ' · imported' : ''}</small></div><div class="w">${p.pmax}<small> W</small></div></div>
+      <div class="ds">
+        <span>Voc <b>${fmt(p.voc, 2)} V</b></span><span>Isc <b>${fmt(p.isc, 2)} A</b></span>
+        <span>Vmp <b>${fmt(p.vmp, 2)} V</b></span><span>Imp <b>${fmt(p.imp, 2)} A</b></span>
+        <span>Efficiency <b>${fmt(p.eff, 2)} %</b></span><span>Cells <b>${p.cells ?? '—'}</b></span>
+        <span>Size <b>${p.length}×${p.width}×${p.thickness ?? '—'}</b></span><span>Weight <b>${p.weight ? fmt(p.weight, 1) + ' kg' : '—'}</b></span>
+        <span>γ Pmax <b>${p.tcPmax ?? '—'} %/°C</b></span><span>β Voc <b>${p.tcVoc ?? '—'} %/°C</b></span>
+        <span>α Isc <b>${p.tcIsc ?? '—'} %/°C</b></span><span>Vmax sys <b>${p.vmax ?? '—'} V</b></span>
+      </div>
+    </div>`).join('');
+  const L = pnl.length / 1000, W = pnl.width / 1000;
+  const slope = s.orientation === 'landscape' ? W : L; // 'auto' → shows portrait gap
+  const autoGap = autoRowGap(slope, (Number(s.tilt) || 0) * Math.PI / 180, centroid(a.ring)[1]);
+  const st = a.stats;
+  sh.innerHTML = `
+    <div class="handle" id="sheetHandle"></div>
+    <div class="shead">
+      <div><h3>${esc(a.name)}</h3><p>${fmt(A, 1)} m² · perimeter ${fmt(per, 1)} m · ${a.ring.length} corners</p></div>
+      <div class="sp"></div>
+      <button class="sbtn danger" id="delArea">Delete</button>
+      <button class="sbtn" id="closeSheet">Done</button>
+    </div>
+    ${others}
+    <h4>① Module</h4>
+    <div class="mods" id="mods">${mods}</div>
+    <div style="display:flex;gap:8px;margin-top:10px"><button class="sbtn" id="importDb">⤓ Import panel database (.json / .csv)</button></div>
+    <div class="note">Starter values from manufacturer datasheets — verify against the latest revision. CSV columns: manufacturer, model, pmax, voc, isc, vmp, imp, eff, length, width, thickness, weight, tcPmax, tcVoc, tcIsc, cells, vmax.</div>
+
+    <h4>② Layout</h4>
+    <span class="lbl2">Orientation</span>
+    ${seg('orientation', [['portrait', 'Portrait'], ['landscape', 'Landscape'], ['auto', 'Best']], s.orientation)}
+    <span class="lbl2">Fill leftover space with the other orientation</span>
+    ${seg('fillGaps', [['on', 'On'], ['off', 'Off']], s.fillGaps === false ? 'off' : 'on')}
+    <span class="lbl2">Mounting</span>
+    ${seg('mount', [['flush', 'Flush / pitched roof'], ['tilted', 'Tilted rows (flat)']], s.mount)}
+    ${s.mount === 'tilted' ? `
+      <div class="grid2" style="margin-top:12px">
+        <div><div class="inpLbl">Tilt</div>${num('tilt', s.tilt, '°')}</div>
+        <div><div class="inpLbl">Row gap (empty = auto)</div>${num('rowGap', s.rowGap, 'm', 'auto ' + autoGap.toFixed(2))}</div>
+      </div>
+      <div class="note">Auto gap: no inter-row shading at solar noon on the winter solstice for this latitude.</div>` : ''}
+    <div class="grid2" style="margin-top:12px">
+      <div><div class="inpLbl">Edge setback</div>${num('setback', s.setback, 'm')}</div>
+      <div><div class="inpLbl">Module gap</div>${num('gap', s.gap, 'm')}</div>
+    </div>
+    <span class="lbl2">Row direction</span>
+    ${seg('align', [['edge', 'Best roof edge'], ['ew', 'East–West'], ['custom', 'Custom']], s.align)}
+    ${s.align === 'custom' ? `<div style="margin-top:10px"><div class="inpLbl">Row azimuth (0 = N, 90 = E)</div>${num('customBearing', s.customBearing, '°')}</div>` : ''}
+
+    <h4>③ Parapets & shading</h4>
+    <span class="lbl2">No-shade window on 21 Dec (rows, parapets, obstacles)</span>
+    ${seg('shadeWin', [['0', 'Noon'], ['2', '10–14 h'], ['3', '9–15 h']], String(project.shadeWin || 0))}
+    <div class="grid2" style="margin-top:12px;align-items:end">
+      <div><div class="inpLbl">Parapet height — all edges</div>${num('parapetAll', '', 'm', 'e.g. 1.0')}</div>
+      <button class="sbtn" id="clearPar" style="height:44px;justify-content:center">Clear parapets</button>
+    </div>
+    <div style="margin-top:8px">${a.ring.map((p, i) => { const q = a.ring[(i + 1) % a.ring.length], P2 = makeProj(centroid(a.ring)), A1 = P2.fwd(p), B1 = P2.fwd(q); const nrm = edgeNormals(a.ring.map(P2.fwd))[i];
+      const sbE = st && st.edgeSetbacks ? st.edgeSetbacks[i] : null;
+      return `<div class="edgeRow"><div class="e">E${i + 1}</div><div>${fmt(Math.hypot(B1[0] - A1[0], B1[1] - A1[1]), 1)} m · faces ${compass(nrm)}<small>${sbE != null ? 'setback ' + fmt(sbE, 2) + ' m' : 'parapet height →'}</small></div>${num('par' + i, (s.parapets || [])[i] || '', 'm', '0')}</div>`; }).join('')}</div>
+    <div class="note">Parapets on the equator-facing side push panels back by their shadow length; the north side (south in the southern hemisphere) only keeps the base setback. Obstacles: tap the red ⊠ button.</div>
+
+    <button class="btn-primary go-btn" id="runLayout">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><rect x="3" y="4" width="7" height="7" rx="1"/><rect x="14" y="4" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      ${a.modules?.length ? 'Re-distribute panels' : 'Distribute panels'}
+    </button>
+    ${st ? `
+      <div class="stats">
+        <div class="stat"><b>${st.count}</b><small>modules</small></div>
+        <div class="stat"><b>${fmt(st.kwp, 2)}</b><small>kWp DC</small></div>
+        <div class="stat"><b>${fmt(st.moduleArea / st.roofArea * 100, 0)}%</b><small>roof covered</small></div>
+        <div class="stat"><b>${fmt(st.moduleArea, 0)} m²</b><small>module area</small></div>
+        <div class="stat"><b>${fmt(st.rowBearing, 0)}°</b><small>row azimuth</small></div>
+        <div class="stat"><b>${st.weight ? fmt(st.weight / 1000, 2) + ' t' : '—'}</b><small>module weight</small></div>
+        <div class="stat" style="grid-column:span 3"><b style="font-size:14px">${st.portrait ?? st.count} portrait · ${st.landscape ?? 0} landscape</b><small>${st.directionsTried || 1} row direction(s) tested · lighter blue = landscape fill</small></div>
+      </div>
+      <div class="next"><span style="font-size:22px">🔌</span><div><b style="color:var(--txt)">Next: DC & AC cabling</b><br>Stringing, combiner/inverter placement and cable routing — next development step.</div></div>` : ''}
+  `;
+  if (keepScroll) sh.scrollTop = top;
+  // wire events
+  $('#closeSheet').onclick = () => { closeSheet(); };
+  $('#sheetHandle').onclick = () => closeSheet();
+  $('#delArea').onclick = async () => {
+    if (await modal({ title: `Delete ${a.name}?`, text: 'The outline and its panel layout will be removed.', ok: 'Delete', danger: true })){
+      project.areas = project.areas.filter(x => x.id !== a.id); selectedAreaId = null; closeSheet(); markDirty(); renderAll();
+    }
+  };
+  sh.querySelectorAll('#areaTabs [data-a]').forEach(b => b.onclick = () => { selectedAreaId = b.dataset.a; renderSheet(); renderAll(); });
+  sh.querySelectorAll('.mod').forEach(m => m.onclick = () => { s.panelId = m.dataset.pid; changed(); });
+  sh.querySelectorAll('[data-seg]').forEach(g => g.querySelectorAll('button').forEach(b => b.onclick = () => { const k = g.dataset.seg; if (k === 'shadeWin'){ project.shadeWin = +b.dataset.v; relayoutAll(); renderAll(); renderSheet(true); return; } s[k] = k === 'fillGaps' ? b.dataset.v === 'on' : b.dataset.v; changed(); }));
+  sh.querySelectorAll('[data-num]').forEach(i => i.onchange = () => { const v = i.value.trim().replace(',', '.');
+    if (i.dataset.num === 'parapetAll'){ const x = +v; if (!isNaN(x)) { s.parapets = a.ring.map(() => x); changed(); } return; }
+    if (/^par\d+$/.test(i.dataset.num)){ const k = +i.dataset.num.slice(3); s.parapets = a.ring.map((_, j) => (s.parapets || [])[j] || 0); s.parapets[k] = isNaN(+v) ? 0 : +v; changed(); return; } s[i.dataset.num] = (i.dataset.num === 'rowGap' && v === '') ? '' : (isNaN(+v) ? s[i.dataset.num] : +v); changed(); });
+  $('#importDb').onclick = () => $('#fileIn').click();
+  $('#clearPar').onclick = () => { s.parapets = []; changed(); };
+  $('#runLayout').onclick = () => runLayout(a, true);
+  function changed(){
+    const { parapets, ...rest } = s; LS.set('solarscout.lastSettings', rest);
+    renderAll();
+    if (a.modules?.length) runLayout(a, false); else { markDirty(); renderSheet(true); }
+  }
+}
+function runLayout(a, announce){
+  const pnl = panelById(a.settings.panelId);
+  const btn = $('#runLayout'); if (btn) btn.innerHTML = `<span class="spinner"></span> Distributing…`;
+  setTimeout(() => {
+    const t0 = performance.now();
+    const res = computeLayout(a.ring, pnl, a.settings, { obstacles: project.obstacles, shadeWin: project.shadeWin || 0 });
+    a.modules = res.modules; a.orients = res.orients; a.stats = res.stats;
+    markDirty(); renderAll(); renderSheet(true);
+    if (announce) toast(res.stats.count ? `${res.stats.count} × ${pnl.pmax} W = ${fmt(res.stats.kwp, 2)} kWp (${Math.round(performance.now() - t0)} ms)` : 'No module fits — reduce setback or check the outline');
+  }, 30);
+}
+
+function relayoutAll(){
+  project.areas.forEach(a => { if (a.modules?.length){ const r = computeLayout(a.ring, panelById(a.settings.panelId), a.settings, { obstacles: project.obstacles, shadeWin: project.shadeWin || 0 }); a.modules = r.modules; a.orients = r.orients; a.stats = r.stats; } });
+}
+// ---------------- Obstacle sheet ----------------
+function openObstacle(id){
+  const ob = obsById(id); if (!ob) return;
+  selectedObsId = id; selectedAreaId = null; renderAll();
+  const sh = $('#sheet'), t = obsType(ob.type);
+  const P = makeProj(centroid(ob.ring)), A = areaM2(ob.ring.map(P.fwd));
+  const lat = ob.ring[0][1], win = project.shadeWin || 0;
+  const sun = sunPositions(lat, 0)[0];
+  sh.innerHTML = `
+    <div class="handle" id="sheetHandle"></div>
+    <div class="shead"><div><h3>${t.i} ${esc(t.n)}</h3><p>${fmt(A, 2)} m² footprint · ${ob.ring.length} corners</p></div><div class="sp"></div>
+      <button class="sbtn danger" id="delObs">Delete</button><button class="sbtn" id="closeSheet">Done</button></div>
+    <h4>Type</h4>
+    <div class="types">${OBS_TYPES.map(x => `<button data-t="${x.k}" class="${x.k === ob.type ? 'on' : ''}"><span style="font-size:18px">${x.i}</span>${esc(x.n)}</button>`).join('')}</div>
+    <div class="grid2" style="margin-top:14px">
+      <div><div class="inpLbl">Height above roof</div><div class="inp"><input inputmode="decimal" id="obH" value="${ob.height}"><span>m</span></div></div>
+      <div><div class="inpLbl">Clearance around it</div><div class="inp"><input inputmode="decimal" id="obC" value="${ob.clearance}"><span>m</span></div></div>
+    </div>
+    <div class="note">Dark area on the map = its shadow during the no-shade window (${WIN_LABEL[win] || 'noon'}, 21 Dec). Noon shadow length: ${fmt((Number(ob.height) || 0) / Math.tan(sun.el), 2)} m. No modules are placed in the obstacle, its clearance or its shadow.</div>
+    <button class="btn-primary go-btn" id="obsMore">＋ Add another obstacle</button>`;
+  sh.classList.add('open'); renderSummary();
+  const apply = () => { markDirty(); relayoutAll(); renderAll(); };
+  $('#closeSheet').onclick = () => closeSheet();
+  $('#sheetHandle').onclick = () => closeSheet();
+  $('#delObs').onclick = () => { project.obstacles = project.obstacles.filter(o => o.id !== id); closeSheet(); apply(); toast('Obstacle removed'); };
+  sh.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { const nt = obsType(b.dataset.t); ob.type = nt.k; ob.height = nt.h; ob.clearance = nt.c; apply(); openObstacle(id); });
+  $('#obH').onchange = e => { const v = +e.target.value.replace(',', '.'); if (!isNaN(v)) { ob.height = Math.max(0, v); apply(); openObstacle(id); } };
+  $('#obC').onchange = e => { const v = +e.target.value.replace(',', '.'); if (!isNaN(v)) { ob.clearance = Math.max(0, v); apply(); openObstacle(id); } };
+  $('#obsMore').onclick = () => startDraw('obstacle');
+}
+// ---------------- Panel DB import ----------------
+$('#fileIn').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try{
+    const txt = await f.text();
+    let rows = f.name.toLowerCase().endsWith('.csv') || !/^\s*[\[{]/.test(txt) ? parseCSV(txt) : JSON.parse(txt);
+    if (!Array.isArray(rows)) rows = rows.panels || rows.modules || [rows];
+    const norm = rows.map(normPanel).filter(Boolean);
+    if (!norm.length) return toast('No valid modules found (need model, pmax, length, width)');
+    const user = LS.get(K_PANELS, []), map2 = new Map(user.map(p => [p.id, p]));
+    norm.forEach(p => map2.set(p.id, p)); LS.set(K_PANELS, [...map2.values()]);
+    toast(`Imported ${norm.length} module(s)`); renderSheet(true);
+  }catch(err){ toast('Could not read file: ' + err.message); }
+};
+function parseCSV(txt){
+  const lines = txt.split(/\r?\n/).filter(l => l.trim()); if (lines.length < 2) return [];
+  const sep = (lines[0].match(/;/g) || []).length > (lines[0].match(/,/g) || []).length ? ';' : ',';
+  const split = l => { const out = []; let cur = '', q = false; for (const ch of l){ if (ch === '"') q = !q; else if (ch === sep && !q){ out.push(cur); cur = ''; } else cur += ch; } out.push(cur); return out.map(x => x.trim()); };
+  const h = split(lines[0]);
+  return lines.slice(1).map(l => { const v = split(l), o = {}; h.forEach((k, i) => o[k] = v[i]); return o; });
+}
+function normPanel(r){
+  const o = {}; Object.keys(r).forEach(k => o[k.toLowerCase().replace(/[^a-z]/g, '')] = r[k]);
+  const pick = (...ks) => { for (const k of ks) if (o[k] !== undefined && o[k] !== '') return o[k]; return undefined; };
+  const n = v => { if (v === undefined) return null; const x = parseFloat(String(v).replace(',', '.')); return isNaN(x) ? null : x; };
+  const model = pick('model', 'name', 'modulename', 'reference');
+  const p = { manufacturer: pick('manufacturer', 'brand', 'maker') || '', model,
+    tech: pick('tech', 'technology', 'type') || '',
+    pmax: n(pick('pmax', 'pmaxw', 'power', 'powerw', 'wp')), vmp: n(pick('vmp', 'vmpp', 'vmpv')), imp: n(pick('imp', 'impp', 'impa')),
+    voc: n(pick('voc', 'vocv')), isc: n(pick('isc', 'isca')), eff: n(pick('eff', 'efficiency', 'effpct')),
+    length: n(pick('length', 'lengthmm', 'l', 'height', 'heightmm')), width: n(pick('width', 'widthmm', 'w')),
+    thickness: n(pick('thickness', 'thicknessmm', 'depth', 'depthmm')), weight: n(pick('weight', 'weightkg')),
+    tcPmax: n(pick('tcpmax', 'gammapmax', 'tempcoeffpmax')), tcVoc: n(pick('tcvoc', 'betavoc', 'tempcoeffvoc')), tcIsc: n(pick('tcisc', 'alphaisc', 'tempcoeffisc')),
+    cells: n(pick('cells', 'cellcount', 'ncells')), vmax: n(pick('vmax', 'maxsystemvoltage', 'vsys')) };
+  if (!p.model || !p.pmax || !p.length || !p.width) return null;
+  if (p.length < 10) { p.length *= 1000; p.width *= 1000; } // given in metres
+  p.id = 'u-' + (p.manufacturer + '-' + p.model).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  return p;
+}
+
+// ---------------- Save / back ----------------
+$('#btnSave').onclick = async () => {
+  if (!project.name){
+    const def = project.location?.label?.split(',')[0] || 'Site ' + new Date().toLocaleDateString();
+    const name = await modal({ title: 'Save project', text: 'Name this site assessment:', input: def, ok: 'Save' });
+    if (!name) return; project.name = name;
+  }
+  toast(saveProject() ? `Saved “${project.name}”` : 'Could not save (storage unavailable)');
+};
+$('#btnBack').onclick = async () => {
+  if (mode === 'draw') return exitDraw();
+  if (dirty && (project.location || project.areas.length)){
+    const r = await modal({ title: 'Leave project?', text: project.name ? 'Save changes before leaving?' : 'This project is not saved yet.', ok: project.name ? 'Save & leave' : 'Leave without saving', cancel: 'Stay' });
+    if (!r) return;
+    if (project.name) saveProject();
+  }
+  spinning = false; closeSheet(); refreshCount(); show('splash');
+};
+window.addEventListener('beforeunload', () => { if (project?.name && dirty) saveProject(); });
+</script>
+</body>
+</html>
