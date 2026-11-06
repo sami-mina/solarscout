@@ -191,6 +191,24 @@ h4{margin:20px 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:1.2
 .maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right{bottom:auto!important;top:calc(var(--st) + 104px)}
 .maplibregl-ctrl-attrib{font-size:9px!important;background:rgba(11,16,38,.6)!important;color:#aaa!important}
 .maplibregl-ctrl-attrib a{color:#ccc!important}
+/* sun simulation */
+#sunBar{position:absolute;left:10px;right:10px;bottom:calc(var(--sb) + 20px);z-index:7;display:none;padding:12px;border-radius:20px;background:var(--glass);border:1px solid rgba(255,214,107,.55);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.sunRow{display:flex;gap:8px;align-items:center}
+.sunRow+.sunRow{margin-top:10px}
+#sunDate{flex:1;min-width:0;height:40px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--txt);padding:0 10px;font-size:14px;font-weight:600;color-scheme:dark}
+.sunPre{flex:none;height:40px;padding:0 9px;border-radius:12px;font-size:12px;font-weight:600;background:rgba(255,255,255,.08);border:1px solid var(--line)}
+#sunPlay{width:40px;height:40px;border-radius:12px}
+#sunTime{flex:1;min-width:0;accent-color:#FFB020;height:28px}
+#sunClock{flex:none;font-size:16px;min-width:48px;text-align:right;color:var(--sun)}
+#sunInfo{font-size:12px;line-height:1.55;margin:10px 2px 0;color:var(--muted)}
+#sunInfo b{color:var(--txt);font-weight:600}
+#sunBar .btns{display:flex;gap:8px;margin-top:10px}
+#sunBar .btns button{flex:1;height:44px;border-radius:14px;font-weight:700;font-size:14px;background:rgba(255,255,255,.1);border:1px solid var(--line)}
+#sunBar .btns .go{background:linear-gradient(95deg,#FFD66B,#FF8A3D);color:#1B0E00;border:0}
+.fab.sunf{background:rgba(255,176,32,.16);border-color:rgba(255,176,32,.6)}
+.sunMk{font-size:26px;line-height:1;filter:drop-shadow(0 0 8px rgba(255,190,60,.9));pointer-events:none}
+.chartBox{margin-top:10px;border-radius:14px;background:#fff;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.chartBox canvas{display:block}
 .spinner{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(255,255,255,.25);border-top-color:var(--sun);animation:spin .8s linear infinite}
 </style>
 </head>
@@ -221,7 +239,7 @@ h4{margin:20px 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:1.2
       Open project <span class="badge" id="projCount">0</span>
     </button>
   </div>
-  <div class="ver">v0.3 · Remote: location, roof, obstacles & parapets, layout</div>
+  <div class="ver">v0.4 · Remote: location, roof, obstacles & parapets, layout, sun path & shading</div>
 </section>
 
 <!-- ============ PROJECTS ============ -->
@@ -252,6 +270,7 @@ h4{margin:20px 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:1.2
   <div id="summary"></div>
 
   <div class="fabs" id="fabs">
+    <button class="fab sunf" id="btnSun" title="Sun path &amp; shading"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg></button>
     <button class="fab" id="btnSave" title="Save"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 3h11l4 4v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 1-2z"/><path d="M8 3v5h8V3M8 21v-7h8v7"/></svg></button>
     <button class="fab" id="btnPanels" title="Panels"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 5h16l-2 14H6z"/><path d="M5 10h14M5.6 14.5h12.8M10 5l-1 14M14 5l1 14"/></svg></button>
     <button class="fab obs" id="btnObs" title="Add obstacle"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF5470" stroke-width="2" stroke-linejoin="round"><rect x="4" y="7" width="16" height="12" rx="1.5"/><path d="M8 7V4h8v3M9 11l6 5M15 11l-6 5"/></svg><span class="lbl" id="obsLbl">Obstacles</span></button>
@@ -267,6 +286,20 @@ h4{margin:20px 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:1.2
     </div>
   </div>
 
+  <div id="sunBar">
+    <div class="sunRow">
+      <input type="date" id="sunDate">
+      <button class="sunPre" data-md="03-21">21 Mar</button><button class="sunPre" data-md="06-21">21 Jun</button><button class="sunPre" data-md="12-21">21 Dec</button>
+    </div>
+    <div class="sunRow">
+      <button class="iconbtn" id="sunPlay" title="Play the day">▶</button>
+      <input type="range" id="sunTime" min="0" max="1435" step="5" value="720">
+      <b id="sunClock">12:00</b>
+    </div>
+    <div id="sunInfo"></div>
+    <div class="btns"><button class="go" id="sunChartBtn">📈 Sun path chart</button><button id="sunClose">Close</button></div>
+  </div>
+
   <div id="sheet"></div>
 </section>
 
@@ -276,7 +309,7 @@ h4{margin:20px 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:1.2
 
 <script>
 /* =====================================================================
-   SolarScout v0.1 — PV site assessment (location → roof area → layout)
+   SolarScout v0.4 — PV site assessment (location → roof area → layout → sun & shading)
    Next steps planned: DC/AC cabling, stringing, inverter matching, export
    ===================================================================== */
 
@@ -545,7 +578,7 @@ function computeLayout(ring, panel, s, opts = {}){
       const r2 = fillGaps ? fillPass(rp, edges, vsb, bb, B.along, B.depth, gx, B.pitch, r1, Math.max(A.rowGap, B.rowGap), zones, huge ? 1 : 4, step, B.tag) : [];
       const all = r1.concat(r2);
       if (!best || all.length > best.rects.length || (all.length === best.rects.length && r2.length < best.nSec))
-        best = { ang, rects: all, nSec: r2.length, A, pri };
+        best = { ang, rects: all, nSec: r2.length, A, pri, faceAz };
     }
   }
   const ang = best.ang, cb = Math.cos(ang), sb2 = Math.sin(ang);
@@ -563,7 +596,8 @@ function computeLayout(ring, panel, s, opts = {}){
       weight: panel.weight ? n * panel.weight : null,
       rowBearing: ((90 - ang * 180 / Math.PI) % 180 + 180) % 180,
       autoRowGap: best.A.autoGap, pitch: best.A.pitch, directionsTried: angles.length,
-      edgeSetbacks: edgeSb, obstacles: (opts.obstacles || []).length
+      edgeSetbacks: edgeSb, obstacles: (opts.obstacles || []).length,
+      faceAz: ((best.faceAz % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
     }
   };
 }
@@ -579,7 +613,7 @@ function compass(rad){ const d = ((rad * 180 / Math.PI) % 360 + 360) % 360; retu
 
 // ---------------- App state ----------------
 let project = null, dirty = false, selectedAreaId = null;
-let mode = 'idle'; // 'idle' | 'draw'
+let mode = 'idle'; // 'idle' | 'draw' | 'sun'
 let drawTarget = 'roof'; // 'roof' | 'obstacle'
 let selectedObsId = null;
 let draft = [];
@@ -715,10 +749,12 @@ function buildMap(){
   });
   map.on('load', () => {
     const empty = { type: 'FeatureCollection', features: [] };
-    ['areas', 'modules', 'draft', 'obstacles', 'obsShade', 'parapets'].forEach(s => map.addSource(s, { type: 'geojson', data: empty }));
+    ['areas', 'modules', 'draft', 'obstacles', 'obsShade', 'parapets', 'sunShade', 'sunMods', 'sunRay'].forEach(s => map.addSource(s, { type: 'geojson', data: empty }));
     map.addLayer({ id: 'areas-fill', type: 'fill', source: 'areas', paint: { 'fill-color': ['case', ['get', 'sel'], 'rgba(255,176,32,0.20)', 'rgba(46,230,168,0.14)'] } });
     map.addLayer({ id: 'modules-fill', type: 'fill', source: 'modules', paint: { 'fill-color': ['case', ['==', ['get', 'o'], 'L'], '#2B5BD7', '#1C3FAA'], 'fill-opacity': 0.93 } });
     map.addLayer({ id: 'modules-line', type: 'line', source: 'modules', paint: { 'line-color': '#A9C8FF', 'line-width': ['interpolate', ['linear'], ['zoom'], 17, 0.3, 21, 1.4] } });
+    map.addLayer({ id: 'sun-mods', type: 'fill', source: 'sunMods', paint: { 'fill-color': '#FF8A3D', 'fill-opacity': 0.9 } });
+    map.addLayer({ id: 'sun-shade', type: 'fill', source: 'sunShade', paint: { 'fill-color': 'rgba(0,0,0,0.42)' } });
     map.addLayer({ id: 'obs-shade', type: 'fill', source: 'obsShade', paint: { 'fill-color': 'rgba(0,0,0,0.38)' } });
     map.addLayer({ id: 'obs-fill', type: 'fill', source: 'obstacles', paint: { 'fill-color': ['case', ['get', 'sel'], 'rgba(255,84,112,0.65)', 'rgba(255,84,112,0.42)'] } });
     map.addLayer({ id: 'obs-line', type: 'line', source: 'obstacles', paint: { 'line-color': '#FF5470', 'line-width': ['case', ['get', 'sel'], 3, 2] } });
@@ -728,10 +764,12 @@ function buildMap(){
     map.addLayer({ id: 'draft-line', type: 'line', source: 'draft', filter: ['==', '$type', 'LineString'], paint: { 'line-color': '#FFB020', 'line-width': 3, 'line-dasharray': [2, 1] } });
     map.addLayer({ id: 'draft-pts', type: 'circle', source: 'draft', filter: ['==', '$type', 'Point'],
       paint: { 'circle-radius': ['case', ['get', 'first'], 10, 7], 'circle-color': ['case', ['get', 'first'], '#FFB020', '#ffffff'], 'circle-stroke-color': '#FF6B3D', 'circle-stroke-width': 2.5 } });
+    map.addLayer({ id: 'sun-ray', type: 'line', source: 'sunRay', paint: { 'line-color': '#FFD66B', 'line-width': 2.5, 'line-dasharray': [2, 1.5] } });
     mapReady = true;
     renderAll();
   });
   map.on('click', onMapClick);
+  map.on('zoomend', () => { if (mode === 'sun') renderSun(); });
   const stop = () => { spinning = false; };
   map.on('mousedown', stop); map.on('touchstart', stop); map.on('wheel', stop);
   map.on('moveend', () => { if (project && project.location) { const cc = map.getCenter(); project.camera = { center: [cc.lng, cc.lat], zoom: map.getZoom(), bearing: map.getBearing() }; } });
@@ -743,7 +781,7 @@ function spin(){
 }
 function openMap(isNew){
   project.obstacles = project.obstacles || []; if (project.shadeWin == null) project.shadeWin = 0; project.mode = project.mode || 'remote';
-  show('mapScreen'); closeSheet(); exitDraw(true); selectedObsId = null;
+  show('mapScreen'); closeSheet(); exitSun(true); exitDraw(true); selectedObsId = null;
   $('#q').value = ''; $('#results').style.display = 'none';
   if (!map) buildMap(); else { map.resize(); }
   if (locMarker){ locMarker.remove(); locMarker = null; }
@@ -811,6 +849,7 @@ function renderSteps(){
   $('#steps').innerHTML = st.map(s => `<button class="chip ${s.done ? 'done' : ''} ${s.active ? 'active' : ''} ${s.locked ? 'locked' : ''}" data-step="${s.n}"><i>${s.done ? '✓' : s.locked ? '🔒' : s.n}</i>${s.t}</button>`).join('');
   $('#steps').querySelectorAll('.chip').forEach(c => c.onclick = () => {
     const n = +c.dataset.step;
+    if (mode === 'sun') exitSun();
     if (n === 1) $('#q').focus();
     if (n === 2) startDraw('roof');
     if (n === 3) startDraw('obstacle');
@@ -836,6 +875,8 @@ function renderAll(){
   project.areas.forEach(a => (a.settings.parapets || []).forEach((hh, i) => { if (Number(hh) > 0 && i < a.ring.length) par.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [a.ring[i], a.ring[(i + 1) % a.ring.length]] } }); }));
   map.getSource('parapets').setData({ type: 'FeatureCollection', features: par });
   renderDraft();
+  map.setLayoutProperty('obs-shade', 'visibility', mode === 'sun' ? 'none' : 'visible');
+  renderSun();
   const sel = areaById(selectedAreaId);
   if (mode !== 'draw') renderEdgeLabels(sel ? sel.ring : [], true, !!sel);
   $('#obsLbl').style.display = project.areas.length && !(project.obstacles || []).length ? '' : 'none';
@@ -863,7 +904,7 @@ function renderEdgeLabels(ring, closed, numbered){
 }
 function renderSummary(){
   const el = $('#summary');
-  if (!project || !project.areas.some(a => a.modules?.length) || mode === 'draw' || $('#sheet').classList.contains('open')){ el.style.display = 'none'; return; }
+  if (!project || !project.areas.some(a => a.modules?.length) || mode !== 'idle' || $('#sheet').classList.contains('open')){ el.style.display = 'none'; return; }
   const n = project.areas.reduce((s, a) => s + (a.modules?.length || 0), 0);
   const kwp = project.areas.reduce((s, a) => s + (a.stats?.kwp || 0), 0);
   const ar = project.areas.reduce((s, a) => s + (a.stats?.roofArea || 0), 0);
@@ -879,7 +920,7 @@ function startDraw(target){
   if (drawTarget === 'obstacle' && !project.areas.length){ toast('Outline the roof first, then add obstacles'); return; }
   if (!project.location && map.getZoom() < 15){ toast('First find the site: search or use your location'); $('#q').focus(); return; }
   if (map.getZoom() < 16.5) toast('Tip: zoom in closer for accurate corners');
-  closeSheet(); mode = 'draw'; draft = []; selectedAreaId = null; selectedObsId = null;
+  exitSun(true); closeSheet(); mode = 'draw'; draft = []; selectedAreaId = null; selectedObsId = null;
   $('#drawBar').style.borderColor = drawTarget === 'obstacle' ? 'rgba(255,84,112,.7)' : 'rgba(255,176,32,.5)';
   map.doubleClickZoom.disable();
   $('#drawBar').style.display = 'block'; $('#fabs').style.display = 'none'; $('#summary').style.display = 'none';
@@ -900,6 +941,7 @@ function updateDrawBar(){
   renderDraft(); renderEdgeLabels(draft, false);
 }
 function onMapClick(e){
+  if (mode === 'sun') return;
   if (mode === 'draw'){
     if (draft.length >= 3){
       const p0 = map.project(draft[0]);
@@ -1104,6 +1146,310 @@ function openObstacle(id){
   $('#obC').onchange = e => { const v = +e.target.value.replace(',', '.'); if (!isNaN(v)) { ob.clearance = Math.max(0, v); apply(); openObstacle(id); } };
   $('#obsMore').onclick = () => startDraw('obstacle');
 }
+// SUN-START ===========================================================
+// NOAA solar position (≈0.1° accuracy). t: UTC ms. Returns radians: el (geometric), az (compass, 0 = N, π/2 = E)
+function solarPos(t, lat, lng){
+  const d = new Date(t), y = d.getUTCFullYear();
+  const doy = Math.floor((t - Date.UTC(y, 0, 1)) / 864e5) + 1;
+  const hr = d.getUTCHours() + d.getUTCMinutes() / 60 + d.getUTCSeconds() / 3600;
+  const nd = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 366 : 365;
+  const g = 2 * Math.PI / nd * (doy - 1 + (hr - 12) / 24);
+  const eqt = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+  const dec = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+  const H = ((hr * 60 + eqt + 4 * lng) / 4 - 180) * D2R, phi = lat * D2R;
+  const el = Math.asin(Math.max(-1, Math.min(1, Math.sin(phi) * Math.sin(dec) + Math.cos(phi) * Math.cos(dec) * Math.cos(H))));
+  const az = Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(phi) - Math.tan(dec) * Math.cos(phi)) + Math.PI;
+  return { el, az: (az + 2 * Math.PI) % (2 * Math.PI) };
+}
+// Site clock time → UTC ms. date 'YYYY-MM-DD', min = minutes after local midnight, tz = UTC offset (h, standard time)
+function siteT(date, min, tz){ const [y, m, d] = date.split('-').map(Number); return Date.UTC(y, m - 1, d) + (min - tz * 60) * 60000; }
+// Sunrise / sunset / solar noon in site clock minutes (null when the sun never rises or never sets)
+function sunTimes(date, lat, lng, tz){
+  const thr = -0.833 * D2R; let rise = null, set = null, noon = 0, maxEl = -9, prev = null;
+  for (let m = 0; m <= 1440; m += 2){
+    const el = solarPos(siteT(date, m, tz), lat, lng).el;
+    if (el > maxEl){ maxEl = el; noon = m; }
+    if (prev != null){
+      if (prev.el < thr && el >= thr && rise == null) rise = prev.m + 2 * (thr - prev.el) / (el - prev.el);
+      if (prev.el >= thr && el < thr) set = prev.m + 2 * (prev.el - thr) / (prev.el - el);
+    }
+    prev = { m, el };
+  }
+  return { rise, set, noon, maxEl };
+}
+const hm = m => { m = ((Math.round(m) % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+function overlaps(A, B){
+  for (const p of A) if (pip(p, B)) return true;
+  for (const p of B) if (pip(p, A)) return true;
+  for (let i = 0; i < A.length; i++) for (let j = 0; j < B.length; j++)
+    if (segsCross(A[i], A[(i + 1) % A.length], B[j], B[(j + 1) % B.length])) return true;
+  return false;
+}
+// Shadows at one instant (local metres around O) and which modules they hit.
+// Flush modules: shaded if any shadow touches the footprint. Tilted modules: if any shadow reaches the lower edge
+// (the edge that sits on the roof — inter-row shading starts there).
+function sunScene(sun, O){
+  const P = makeProj(O), k = 1 / Math.tan(Math.max(sun.el, 2 * D2R));
+  const vec = h => [-Math.sin(sun.az) * h * k, -Math.cos(sun.az) * h * k];
+  const add = (p, v) => [p[0] + v[0], p[1] + v[1]];
+  const shadows = [], targets = [];
+  (project.obstacles || []).forEach(ob => {
+    const h = Number(ob.height) || 0; if (h <= 0) return;
+    const b = ob.ring.map(P.fwd), v = vec(h);
+    shadows.push({ pts: convexHull(b.concat(b.map(p => add(p, v)))), src: 'o' });
+  });
+  project.areas.forEach((a, ai) => {
+    const ring = a.ring.map(P.fwd), st = a.settings;
+    (st.parapets || []).forEach((hh, i) => {
+      const h = Number(hh) || 0; if (h <= 0 || i >= ring.length) return;
+      const p = ring[i], q = ring[(i + 1) % ring.length], v = vec(h);
+      shadows.push({ pts: [p, q, add(q, v), add(p, v)], src: 'p' });
+    });
+    const tilt = (Number(st.tilt) || 0) * D2R;
+    const tilted = st.mount === 'tilted' && tilt > 0 && a.stats && a.stats.faceAz != null;
+    const pnl = panelById(st.panelId), Lm = pnl.length / 1000, Wm = pnl.width / 1000;
+    (a.modules || []).forEach((m, mi) => {
+      const q = m.map(P.fwd), key = ai + ':' + mi;
+      if (!tilted){ targets.push({ pts: q, key, ll: m }); return; }
+      const back = a.stats.faceAz + Math.PI; let hi = 0, bd = 9;
+      edgeNormals(q).forEach((n, i) => { const d = Math.abs(Math.atan2(Math.sin(n - back), Math.cos(n - back))); if (d < bd){ bd = d; hi = i; } });
+      const A = q[hi], B = q[(hi + 1) % 4], C = q[(hi + 2) % 4], D = q[(hi + 3) % 4];
+      const v = vec(((a.orients || [])[mi] === 'L' ? Wm : Lm) * Math.sin(tilt));
+      shadows.push({ pts: convexHull([C, D, add(A, v), add(B, v)]), src: key });
+      const ux = D[0] - C[0], uy = D[1] - C[1], len = Math.hypot(ux, uy) || 1, f = Math.min(0.03, len / 4) / len;
+      targets.push({ pts: [[C[0] + ux * f, C[1] + uy * f], [D[0] - ux * f, D[1] - uy * f]], key, ll: m });
+    });
+  });
+  // spatial grid over shadows
+  const cell = 4, grid = new Map(), cells = (bb, fn) => { for (let x = Math.floor(bb.x0 / cell); x <= Math.floor(bb.x1 / cell); x++) for (let y = Math.floor(bb.y0 / cell); y <= Math.floor(bb.y1 / cell); y++) fn(x + ',' + y); };
+  shadows.forEach((s, i) => { s.bb = bboxOf(s.pts); cells(s.bb, c => { let l = grid.get(c); if (!l) grid.set(c, l = []); l.push(i); }); });
+  const shaded = [];
+  targets.forEach(t => {
+    const bb = bboxOf(t.pts), seen = new Set(); let hit = false;
+    cells(bb, c => {
+      if (hit) return;
+      for (const i of grid.get(c) || []){
+        if (seen.has(i)) continue; seen.add(i);
+        const s = shadows[i];
+        if (s.src === t.key || bb.x1 < s.bb.x0 || bb.x0 > s.bb.x1 || bb.y1 < s.bb.y0 || bb.y0 > s.bb.y1) continue;
+        if (overlaps(t.pts, s.pts)){ hit = true; return; }
+      }
+    });
+    if (hit) shaded.push(t.ll);
+  });
+  return { shadows: shadows.map(s => s.pts.map(P.inv)), shaded, total: targets.length, P };
+}
+
+// Sun path diagram (Cartesian: azimuth × elevation). Curves = 21st of each month, loops = clock hours (analemmas).
+function drawSunChart(cv, W, H, scale, o){
+  cv.width = Math.round(W * scale); cv.height = Math.round(H * scale);
+  const g = cv.getContext('2d'); g.setTransform(scale, 0, 0, scale, 0, 0);
+  const fs = Math.max(10, W / 72), F = (w, k = 1) => `${w} ${fs * k}px Sora, system-ui, -apple-system, sans-serif`;
+  g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+  const yr = +o.date.slice(0, 4), center = o.lat >= 0 ? 180 : 0;
+  const rel = az => ((az / D2R - center) % 360 + 540) % 360 - 180;
+  const pt = t => { const s = solarPos(t, o.lat, o.lng); return { x: rel(s.az), y: s.el / D2R }; };
+  const dayCurve = ds => { const out = []; for (let m = 0; m <= 1440; m += 4) out.push(pt(siteT(ds, m, o.tz))); return out; };
+  const MON = [[12, '21 Dec'], [1, '21 Jan · 21 Nov'], [2, '21 Feb · 21 Oct'], [3, '21 Mar · 21 Sep'], [4, '21 Apr · 21 Aug'], [5, '21 May · 21 Jul'], [6, '21 Jun']];
+  if (o.lat < 0) MON.reverse();
+  const curves = MON.map(([m, l]) => ({ l, pts: dayCurve(`${yr}-${String(m).padStart(2, '0')}-21`) }));
+  const hours = [];
+  for (let h = 0; h < 24; h++){
+    const pts = []; for (let dd = 0; dd <= 366; dd += 3) pts.push(pt(Date.UTC(yr, 0, 1 + dd) + (h * 60 - o.tz * 60) * 60000));
+    if (pts.some(p => p.y > 0.5)) hours.push({ h, pts });
+  }
+  const sel = dayCurve(o.date);
+  let xm = 60, ym = 30;
+  curves.concat([{ pts: sel }]).forEach(c => c.pts.forEach(p => { if (p.y > 0){ xm = Math.max(xm, Math.abs(p.x)); ym = Math.max(ym, p.y); } }));
+  const XR = Math.min(180, Math.ceil((xm + 3) / 30) * 30), YR = Math.min(90, Math.ceil((ym + 2) / 10) * 10);
+  const L = fs * 4, R = fs * 1.6, T = fs * 5.4, B = fs * 5.2;
+  const X = v => L + (v + XR) / (2 * XR) * (W - L - R), Y = v => H - B - v / YR * (H - T - B);
+  // titles
+  g.fillStyle = '#111827'; g.font = F(700, 1.45); g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+  g.fillText('Sun path diagram' + (o.title ? ' — ' + o.title : ''), L, fs * 1.9);
+  g.fillStyle = '#6B7280'; g.font = F(400, 0.95);
+  const ll = `${Math.abs(o.lat).toFixed(4)}°${o.lat >= 0 ? 'N' : 'S'}, ${Math.abs(o.lng).toFixed(4)}°${o.lng >= 0 ? 'E' : 'W'}`;
+  const tzs = 'UTC' + (o.tz >= 0 ? '+' : '−') + Math.abs(o.tz);
+  g.fillText(`${ll} · ${yr} · times in local standard time (${tzs}, no daylight saving)`, L, fs * 3.4);
+  // grid
+  g.lineWidth = 1; g.strokeStyle = '#E5E7EB'; g.fillStyle = '#4B5563'; g.font = F(500, 0.85);
+  for (let v = 0; v <= YR; v += 10){ g.beginPath(); g.moveTo(X(-XR), Y(v)); g.lineTo(X(XR), Y(v)); g.stroke(); g.textAlign = 'right'; g.textBaseline = 'middle'; g.fillText(v + '°', L - fs * 0.5, Y(v)); }
+  for (let v = -XR; v <= XR; v += 15){
+    g.strokeStyle = v % 90 === 0 ? '#D1D5DB' : '#EEF0F3'; g.beginPath(); g.moveTo(X(v), Y(0)); g.lineTo(X(v), Y(YR)); g.stroke();
+    if (v % 30 === 0){ const az = ((v + center) % 360 + 360) % 360; g.textAlign = 'center'; g.textBaseline = 'top'; g.fillStyle = '#4B5563';
+      g.fillText(az + '°', X(v), Y(0) + fs * 0.5); if (az % 45 === 0){ g.fillStyle = '#111827'; g.font = F(700, 0.85); g.fillText(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][az / 45], X(v), Y(0) + fs * 1.6); g.font = F(500, 0.85); } }
+  }
+  g.strokeStyle = '#374151'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(X(-XR), Y(0)); g.lineTo(X(XR), Y(0)); g.stroke();
+  g.fillStyle = '#374151'; g.font = F(600, 0.9); g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  g.fillText('Azimuth (° from North, clockwise)', (X(-XR) + X(XR)) / 2, H - fs * 1.9);
+  g.save(); g.translate(fs * 1.1, (Y(0) + Y(YR)) / 2); g.rotate(-Math.PI / 2); g.fillText('Solar elevation (°)', 0, 0); g.restore();
+  // curves (clipped to the plot)
+  g.save(); g.beginPath(); g.rect(X(-XR), Y(YR), X(XR) - X(-XR), Y(0) - Y(YR)); g.clip();
+  const line = (pts, color, w, dash = []) => {
+    g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash); g.lineJoin = 'round'; g.beginPath(); let pen = false;
+    for (let i = 1; i < pts.length; i++){ const a = pts[i - 1], b = pts[i];
+      if ((a.y > 0 || b.y > 0) && Math.abs(a.x - b.x) < 90){ if (!pen) g.moveTo(X(a.x), Y(a.y)); g.lineTo(X(b.x), Y(b.y)); pen = true; } else pen = false; }
+    g.stroke(); g.setLineDash([]);
+  };
+  hours.forEach(hh => line(hh.pts, '#A3AAB8', 1.1));
+  const mix = (t) => { const a = [59, 130, 246], b = [245, 120, 11]; return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(',')})`; };
+  curves.forEach((c, i) => line(c.pts, mix(i / (curves.length - 1)), 2));
+  line(sel, '#E0457B', 3.2);
+  g.restore();
+  // labels with a white halo
+  const label = (txt, x, y, color, font, align = 'left', base = 'bottom') => { g.font = font; g.textAlign = align; g.textBaseline = base; g.lineWidth = 4; g.strokeStyle = 'rgba(255,255,255,.92)'; g.strokeText(txt, x, y); g.fillStyle = color; g.fillText(txt, x, y); };
+  hours.forEach(hh => { const top = hh.pts.reduce((a, b) => b.y > a.y ? b : a); if (top.y > 2 && Math.abs(top.x) < XR) label(hh.h + 'h', X(top.x), Y(top.y) - fs * 0.3, '#4B5563', F(600, 0.8), 'center'); });
+  curves.forEach((c, i) => {
+    const vis = c.pts.filter(p => p.y > 0 && p.x > 0); if (!vis.length) return;
+    const mx = Math.max(...vis.map(p => p.x)), p = vis.reduce((a, b) => Math.abs(b.x - mx * 0.62) < Math.abs(a.x - mx * 0.62) ? b : a);
+    label(c.l, X(p.x) + fs * 0.4, Y(p.y) - fs * 0.15, mix(i / (curves.length - 1)), F(700, 0.78));
+  });
+  // selected moment
+  const now = solarPos(siteT(o.date, o.min, o.tz), o.lat, o.lng), nx = rel(now.az), ny = now.el / D2R;
+  if (ny > 0){
+    g.fillStyle = '#FFB020'; g.strokeStyle = '#E0457B'; g.lineWidth = 2.5; g.beginPath(); g.arc(X(nx), Y(ny), fs * 0.62, 0, 7); g.fill(); g.stroke();
+    label(`${hm(o.min)} · Az ${Math.round(now.az / D2R)}° · El ${(ny).toFixed(1)}°`, X(nx) + (nx > 0 ? -fs : fs), Y(ny) - fs * 0.8, '#B4235A', F(700, 0.85), nx > 0 ? 'right' : 'left');
+  }
+  // footer: legend + selected-day facts
+  const tm = sunTimes(o.date, o.lat, o.lng, o.tz);
+  const dl = new Date(o.date + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  g.font = F(500, 0.82); g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  let fx = L; const fy = H - fs * 0.55;
+  const key = (color, txt, w) => { g.strokeStyle = color; g.lineWidth = w; g.beginPath(); g.moveTo(fx, fy - fs * 0.3); g.lineTo(fx + fs * 1.6, fy - fs * 0.3); g.stroke(); fx += fs * 2; g.fillStyle = '#374151'; g.fillText(txt, fx, fy); fx += g.measureText(txt).width + fs * 1.2; };
+  key('#F5780B', '21st of month', 2); key('#A3AAB8', 'clock hour', 1.2);
+  key('#E0457B', `${dl}: ↑ ${tm.rise != null ? hm(tm.rise) : '—'}  ↓ ${tm.set != null ? hm(tm.set) : '—'}  · max ${(tm.maxEl / D2R).toFixed(1)}°`, 3);
+  g.fillStyle = '#9CA3AF'; g.textAlign = 'right'; g.fillText('SolarScout', W - R, fy);
+}
+
+// ---------------- Sun simulation UI ----------------
+const sunSt = { date: null, min: 720, playing: false, timer: null, marker: null };
+const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+function sunSite(){
+  if (project.areas.length){ const sel = areaById(selectedAreaId) || project.areas[0]; return centroid(sel.ring); }
+  if (project.location) return [project.location.lng, project.location.lat];
+  if (map && map.getZoom() >= 15){ const c = map.getCenter(); return [c.lng, c.lat]; }
+  return null;
+}
+const sunTz = O => project.sunTz != null ? project.sunTz : Math.round(O[0] / 15);
+function sunRange(){
+  const O = sunSite(), t = sunTimes(sunSt.date, O[1], O[0], sunTz(O));
+  const lo = t.rise != null ? Math.max(0, Math.floor(t.rise / 5) * 5) : 0, hi = t.set != null ? Math.min(1435, Math.ceil(t.set / 5) * 5) : 1435;
+  return { lo, hi: Math.max(hi, lo + 5), t };
+}
+function enterSun(){
+  if (!project || !sunSite()) return toast('First find the site: search or use your location');
+  exitDraw(true); closeSheet(); mode = 'sun'; selectedObsId = null;
+  // older tilted layouts don't know which way they face — recompute once
+  project.areas.forEach(a => { if (a.modules?.length && a.settings.mount === 'tilted' && a.stats && a.stats.faceAz == null){ const r = computeLayout(a.ring, panelById(a.settings.panelId), a.settings, { obstacles: project.obstacles, shadeWin: project.shadeWin || 0 }); a.modules = r.modules; a.orients = r.orients; a.stats = r.stats; } });
+  if (!sunSt.date) sunSt.date = todayStr();
+  const O = sunSite(), tz = sunTz(O), now = new Date();
+  // start at the site's current clock time if the sun is up, else at solar noon
+  const nowMin = ((now.getUTCHours() * 60 + now.getUTCMinutes() + tz * 60) % 1440 + 1440) % 1440;
+  const r = sunRange();
+  sunSt.min = sunSt.date === todayStr() && nowMin >= r.lo && nowMin <= r.hi ? Math.round(nowMin / 5) * 5 : Math.round(r.t.noon / 5) * 5;
+  $('#sunDate').value = sunSt.date;
+  $('#fabs').style.display = 'none'; $('#sunBar').style.display = 'block';
+  syncSunBar(); renderAll();
+}
+function exitSun(silent){
+  sunStop();
+  const was = mode === 'sun'; if (was) mode = 'idle';
+  $('#sunBar').style.display = 'none';
+  if (was) $('#fabs').style.display = 'flex';
+  if (sunSt.marker){ sunSt.marker.remove(); sunSt.marker = null; }
+  if (was && !silent) renderAll(); else if (mapReady) renderSun();
+}
+function syncSunBar(){
+  const r = sunRange(), sl = $('#sunTime');
+  sl.min = r.lo; sl.max = r.hi; sunSt.min = Math.min(r.hi, Math.max(r.lo, sunSt.min)); sl.value = sunSt.min;
+  $('#sunClock').textContent = hm(sunSt.min);
+}
+function renderSun(){
+  if (!mapReady) return;
+  const empty = { type: 'FeatureCollection', features: [] };
+  if (mode !== 'sun' || !project){ ['sunShade', 'sunMods', 'sunRay'].forEach(s => map.getSource(s).setData(empty)); return; }
+  const O = sunSite(), tz = sunTz(O), sun = solarPos(siteT(sunSt.date, sunSt.min, tz), O[1], O[0]);
+  const r = sunRange(), times = `↑ ${r.t.rise != null ? hm(r.t.rise) : '—'} · ↓ ${r.t.set != null ? hm(r.t.set) : '—'}`;
+  const elD = sun.el / D2R;
+  if (elD <= 0){
+    ['sunShade', 'sunMods', 'sunRay'].forEach(s => map.getSource(s).setData(empty));
+    if (sunSt.marker){ sunSt.marker.remove(); sunSt.marker = null; }
+    $('#sunInfo').innerHTML = `<b>Sun below the horizon</b> · ${times} · UTC${tz >= 0 ? '+' : ''}${tz}`; return;
+  }
+  const sc = sunScene(sun, O);
+  map.getSource('sunShade').setData({ type: 'FeatureCollection', features: sc.shadows.map(p => ({ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ringClosed(p)] } })) });
+  map.getSource('sunMods').setData({ type: 'FeatureCollection', features: sc.shaded.map(m => ({ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ringClosed(m)] } })) });
+  const mpp = 40075016.7 * Math.cos(O[1] * D2R) / (512 * Math.pow(2, map.getZoom()));   // metres per screen pixel
+  const len = 120 * mpp * Math.max(0.4, Math.cos(sun.el)), end = sc.P.inv([Math.sin(sun.az) * len, Math.cos(sun.az) * len]);
+  map.getSource('sunRay').setData({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [O, end] } }] });
+  if (!sunSt.marker){ const el = document.createElement('div'); el.className = 'sunMk'; el.textContent = '☀️'; sunSt.marker = new maplibregl.Marker({ element: el }).setLngLat(end).addTo(map); }
+  else sunSt.marker.setLngLat(end);
+  const shadeTxt = sc.total ? `<b>${sc.shaded.length}</b> of ${sc.total} modules shaded` : 'No modules laid out yet';
+  $('#sunInfo').innerHTML = `☀ Az <b>${Math.round(sun.az / D2R)}° ${compass(sun.az)}</b> · El <b>${elD.toFixed(1)}°</b> · ${times} · UTC${tz >= 0 ? '+' : ''}${tz}<br>${shadeTxt} · ${(project.obstacles || []).filter(o => +o.height > 0).length} obstacle(s) · ${project.areas.reduce((s, a) => s + (a.settings.parapets || []).filter(h => +h > 0).length, 0)} parapet edge(s)`;
+  if ($('#sheet').classList.contains('open') && $('#sunCv')) drawSunChartIn();
+}
+function sunStop(){ sunSt.playing = false; clearInterval(sunSt.timer); sunSt.timer = null; $('#sunPlay').textContent = '▶'; }
+function sunPlay(){
+  if (sunSt.playing) return sunStop();
+  sunSt.playing = true; $('#sunPlay').textContent = '❚❚';
+  sunSt.timer = setInterval(() => {
+    const sl = $('#sunTime'); let v = sunSt.min + 10; if (v > +sl.max) v = +sl.min;
+    sunSt.min = v; sl.value = v; $('#sunClock').textContent = hm(v); renderSun();
+  }, 90);
+}
+$('#btnSun').onclick = () => enterSun();
+$('#sunClose').onclick = () => exitSun();
+$('#sunPlay').onclick = () => sunPlay();
+$('#sunTime').oninput = e => { sunStop(); sunSt.min = +e.target.value; $('#sunClock').textContent = hm(sunSt.min); renderSun(); };
+$('#sunDate').onchange = e => { if (!e.target.value) return; sunSt.date = e.target.value; syncSunBar(); renderSun(); };
+document.querySelectorAll('.sunPre').forEach(b => b.onclick = () => { sunSt.date = (sunSt.date || todayStr()).slice(0, 4) + '-' + b.dataset.md; $('#sunDate').value = sunSt.date; syncSunBar(); renderSun(); });
+$('#sunChartBtn').onclick = () => openSunChart();
+
+function sunChartOpts(){
+  const O = sunSite();
+  return { lat: O[1], lng: O[0], tz: sunTz(O), date: sunSt.date, min: sunSt.min, title: project.name || (project.location?.label || '').split(',')[0] };
+}
+function drawSunChartIn(){
+  const cv = $('#sunCv'); if (!cv) return;
+  const W = Math.max(640, $('#sheet').clientWidth - 32), H = Math.round(W * 0.66);
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  drawSunChart(cv, W, H, Math.min(3, window.devicePixelRatio || 1), sunChartOpts());
+}
+function openSunChart(){
+  sunStop();
+  const sh = $('#sheet'), o = sunChartOpts();
+  sh.innerHTML = `
+    <div class="handle" id="sheetHandle"></div>
+    <div class="shead"><div><h3>☀ Sun path diagram</h3><p>Whole year at this site · pink = ${esc(o.date)}</p></div><div class="sp"></div><button class="sbtn" id="closeSheet">Done</button></div>
+    <div class="chartBox"><canvas id="sunCv"></canvas></div>
+    <div class="note">Coloured curves: the sun's path on the 21st of each month (Dec → Jun). Grey figure-8 loops: where the sun is at each clock hour through the year. Scroll sideways on narrow screens.</div>
+    <div class="grid2" style="margin-top:12px;align-items:end">
+      <div><div class="inpLbl">Time zone (standard time)</div><div class="inp"><span style="margin-right:6px">UTC</span><input inputmode="decimal" id="sunTzIn" value="${o.tz}"><span>h</span></div></div>
+      <button class="sbtn" id="sunTzAuto" style="height:44px;justify-content:center">Auto from longitude</button>
+    </div>
+    <div class="note">Daylight saving is not applied — in summer, local clocks may read one hour later.</div>
+    <button class="btn-primary go-btn" id="sunDl">⤓ Download chart (PNG)</button>`;
+  sh.classList.add('open'); renderSummary();
+  requestAnimationFrame(drawSunChartIn);
+  $('#closeSheet').onclick = () => closeSheet();
+  $('#sheetHandle').onclick = () => closeSheet();
+  const setTz = v => { project.sunTz = v; markDirty(); syncSunBar(); renderSun(); drawSunChartIn(); };
+  $('#sunTzIn').onchange = e => { const v = +e.target.value.replace(',', '.').replace('+', ''); if (!isNaN(v) && v >= -12 && v <= 14) setTz(v); else e.target.value = sunTz(sunSite()); };
+  $('#sunTzAuto').onclick = () => { delete project.sunTz; const v = sunTz(sunSite()); $('#sunTzIn').value = v; setTz(v); delete project.sunTz; };
+  $('#sunDl').onclick = () => {
+    const cv = document.createElement('canvas'), oo = sunChartOpts();
+    drawSunChart(cv, 1600, 1060, 2, oo);
+    const name = 'sun-path-' + (oo.title || 'site').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.png';
+    cv.toBlob(b => {
+      if (!b) return toast('Could not create the image');
+      const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name;
+      document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      toast('Chart saved: ' + name);
+    }, 'image/png');
+  };
+}
+// SUN-END =============================================================
+
 // ---------------- Panel DB import ----------------
 $('#fileIn').onchange = async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
@@ -1155,6 +1501,7 @@ $('#btnSave').onclick = async () => {
 };
 $('#btnBack').onclick = async () => {
   if (mode === 'draw') return exitDraw();
+  if (mode === 'sun') return exitSun();
   if (dirty && (project.location || project.areas.length)){
     const r = await modal({ title: 'Leave project?', text: project.name ? 'Save changes before leaving?' : 'This project is not saved yet.', ok: project.name ? 'Save & leave' : 'Leave without saving', cancel: 'Stay' });
     if (!r) return;
