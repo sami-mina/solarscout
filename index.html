@@ -249,7 +249,7 @@ h4{margin:20px 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:1.2
       Open project <span class="badge" id="projCount">0</span>
     </button>
   </div>
-  <div class="ver">v0.5.1 · Remote: location, roof, obstacles & parapets, layout, sun path & shading</div>
+  <div class="ver">v0.5.2 · Remote: location, roof, obstacles & parapets, layout, sun path & shading</div>
 </section>
 
 <!-- ============ PROJECTS ============ -->
@@ -1021,10 +1021,10 @@ function nbInfo(n){
 async function findNeighbours(auto){
   if (!project.areas.length) return toast('Outline the roof first');
   const proj0 = project, O = centroid(project.areas.flatMap(a => a.ring));
-  if (!auto) toast('Looking up neighbouring buildings…');
+  toast('Looking up neighbouring buildings…', 8000);
   let list;
   try{ list = await fetchBuildings(O[0], O[1], 110); }
-  catch(e){ if (!auto) toast('Building lookup unavailable (offline or server busy)'); return; }
+  catch(e){ toast('Neighbour lookup failed — ' + e.message, 5200); return; }
   if (project !== proj0) return;   // user switched project meanwhile
   const P = makeProj(O), roofs = project.areas.map(a => a.ring.map(P.fwd));
   const own = [], nb = [];
@@ -1042,7 +1042,7 @@ async function findNeighbours(auto){
   const rh = siteRoofH(), tall = nbObstacles().length, unk = project.neighbours.filter(n => n.h == null).length;
   toast(!project.neighbours.length ? 'No neighbouring buildings mapped nearby'
     : rh == null ? `${project.neighbours.length} neighbouring buildings found — set your roof height (Panels → ③) to use them for shading`
-    : `${project.neighbours.length} neighbours found · ${tall} taller than your roof${unk ? ` · ${unk} with unknown height (tap them to set)` : ''}`, 4800);
+    : `${project.neighbours.length} neighbours found (${bldSrc}) · ${tall} taller than your roof${unk ? ` · ${unk} with unknown height (tap them to set)` : ''}`, 4800);
 }
 async function editNeighbour(id){
   const n = (project.neighbours || []).find(x => x.id === id); if (!n) return;
@@ -1092,20 +1092,66 @@ function wireNbSection(){
   });
 }
 // ---------------- Building outline from OpenStreetMap ----------------
-const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
-async function fetchBuildings(lng, lat, r = 45){
-  const q = `[out:json][timeout:20];(way["building"](around:${r},${lat},${lng});relation["building"](around:${r},${lat},${lng});way["building:part"](around:${r},${lat},${lng}););out geom tags;`;
-  let lastErr;
-  for (const url of OVERPASS){
-    const ac = new AbortController(), to = setTimeout(() => ac.abort(), 15000);
+const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+// Buildings around a point. 1) Overpass (exact OSM geometry; two servers asked in parallel),
+// 2) fallback: OpenFreeMap vector tiles (fast CDN, ~0.6 m precision, heights included).
+let bldSrc = '';
+const errTxt = e => e?.name === 'AbortError' ? 'timeout' : e instanceof TypeError ? 'no connection / blocked' : (e?.message || 'error');
+async function overpassBuildings(lng, lat, r){
+  const q = `[out:json][timeout:15];(way["building"](around:${r},${lat},${lng});relation["building"](around:${r},${lat},${lng});way["building:part"](around:${r},${lat},${lng}););out geom;`;
+  const acs = [];
+  const one = async url => {
+    const ac = new AbortController(); acs.push(ac); const to = setTimeout(() => ac.abort(), 9000);
     try{
       const res = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ac.signal });
-      clearTimeout(to);
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      return parseBuildings(await res.json());
-    }catch(e){ clearTimeout(to); lastErr = e; }
+      const js = await res.json();
+      if (js.remark && /error|timed out|rate/i.test(js.remark) && !(js.elements || []).length) throw new Error('server busy');
+      return parseBuildings(js);
+    } finally { clearTimeout(to); }
+  };
+  try{ const out = await Promise.any(OVERPASS.slice(0, 2).map(one)); acs.forEach(a => a.abort()); return out; }
+  catch(agg){ throw new Error((agg.errors || [agg]).map(errTxt).join(' / ')); }
+}
+const OFM = 'https://tiles.openfreemap.org/planet';
+async function tileBuildings(lng, lat, r){
+  if (!map) throw new Error('map not ready');
+  if (!map.getSource('ofm')){
+    map.addSource('ofm', { type: 'vector', url: OFM });
+    map.addLayer({ id: 'ofm-bld', type: 'fill', source: 'ofm', 'source-layer': 'building', minzoom: 13, paint: { 'fill-color': '#000', 'fill-opacity': 0 } }, 'nb-fill');
   }
-  throw lastErr || new Error('unavailable');
+  const t0 = Date.now();
+  let feats = [];
+  while (Date.now() - t0 < 12000){
+    map.triggerRepaint();
+    await new Promise(res => { let done = false; const f = () => { if (!done){ done = true; res(); } }; map.once('idle', f); setTimeout(f, 1500); });
+    feats = map.querySourceFeatures('ofm', { sourceLayer: 'building' });
+    if (feats.length && map.isSourceLoaded('ofm')) break;
+    if (map.getZoom() < 13) throw new Error('zoom in');
+  }
+  if (!feats.length) throw new Error(map.isSourceLoaded('ofm') ? 'no buildings in tiles' : 'tiles timeout');
+  const P = makeProj([lng, lat]), seen = new Set(), out = [];
+  feats.forEach(f => {
+    const g = f.geometry, polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+    polys.forEach(pc => {
+      const ring = pc[0].slice(0, -1); if (ring.length < 3) return;
+      const key = (f.id ?? '') + ':' + ring.map(p => p[0].toFixed(6) + ',' + p[1].toFixed(6)).join(';');
+      if (seen.has(key)) return; seen.add(key);
+      const q = ring.map(P.fwd); let d = pip([0, 0], q) ? 0 : Infinity;
+      if (d) q.forEach((p, i) => { d = Math.min(d, distSeg([0, 0], p, q[(i + 1) % q.length])); });
+      if (d > r) return;
+      const rh = Number(f.properties.render_height);
+      // OpenMapTiles uses 5 m when the height is unknown
+      out.push({ id: 't/' + (f.id ?? key.length + ':' + out.length), ring, part: false, levels: null, height: rh && rh !== 5 ? rh : null, name: '' });
+    });
+  });
+  return out;
+}
+async function fetchBuildings(lng, lat, r = 45){
+  let e1;
+  try{ const l = await overpassBuildings(lng, lat, r); bldSrc = 'OpenStreetMap'; return l; } catch(e){ e1 = e; }
+  try{ const l = await tileBuildings(lng, lat, r); bldSrc = 'OpenFreeMap tiles'; return l; }
+  catch(e2){ throw new Error(`OSM server: ${e1.message}; map tiles: ${errTxt(e2)}`); }
 }
 function parseBuildings(js){
   const out = [];
@@ -1156,10 +1202,10 @@ async function autoDetectAt(ll){
     updateDrawBar();
     const P = makeProj(centroid(draft));
     const info = b.height ? `${fmt(b.height, 1)} m high` : b.levels ? `${b.levels} floors` : 'height unknown';
-    toast(`Building found: ${fmt(areaM2(draft.map(P.fwd)), 0)} m² · ${info}. Check it against the image, drag corners if needed, then “Close shape”.`, 5200);
+    toast(`Building found (${bldSrc}): ${fmt(areaM2(draft.map(P.fwd)), 0)} m² · ${info}. Check it against the image, drag corners if needed, then “Close shape”.`, 5200);
   }catch(e){
     autoBusy = false; updateDrawBar();
-    toast('Building lookup unavailable (offline or server busy) — tap the corners by hand', 3600);
+    toast('Building lookup failed (' + e.message + ') — tap the corners by hand', 6000);
   }
 }
 let lastOsm = null;
