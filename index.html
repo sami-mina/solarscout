@@ -209,6 +209,10 @@ h4{margin:20px 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:1.2
 .sunMk{font-size:26px;line-height:1;filter:drop-shadow(0 0 8px rgba(255,190,60,.9));pointer-events:none}
 .chartBox{margin-top:10px;border-radius:14px;background:#fff;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .chartBox canvas{display:block}
+/* compass rose */
+#compass{position:absolute;left:10px;top:calc(var(--st) + 106px);z-index:4;width:58px;height:58px;border-radius:50%;padding:0;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 4px 14px rgba(0,0,0,.35)}
+#compass svg{width:100%;height:100%;transition:transform .15s linear}
+#compass:active{transform:scale(.95)}
 .spinner{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(255,255,255,.25);border-top-color:var(--sun);animation:spin .8s linear infinite}
 </style>
 </head>
@@ -239,7 +243,7 @@ h4{margin:20px 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:1.2
       Open project <span class="badge" id="projCount">0</span>
     </button>
   </div>
-  <div class="ver">v0.4 · Remote: location, roof, obstacles & parapets, layout, sun path & shading</div>
+  <div class="ver">v0.4.1 · Remote: location, roof, obstacles & parapets, layout, sun path & shading</div>
 </section>
 
 <!-- ============ PROJECTS ============ -->
@@ -267,6 +271,19 @@ h4{margin:20px 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:1.2
   <div id="results"></div>
   <div class="steps" id="steps"></div>
 
+  <button id="compass" title="Tap to point North up">
+    <svg viewBox="0 0 60 60"><g id="roseG">
+      <path d="M30 6 L35 30 L30 27 L25 30 Z" fill="#FF5470"/>
+      <path d="M30 54 L35 30 L30 33 L25 30 Z" fill="#C9D0EE"/>
+      <path d="M54 30 L30 34 L33 30 L30 26 Z" fill="#7B86B5"/>
+      <path d="M6 30 L30 34 L27 30 L30 26 Z" fill="#7B86B5"/>
+      <circle cx="30" cy="30" r="2.6" fill="#0B1026" stroke="#fff" stroke-width="1"/>
+      <g font-family="Sora,system-ui,sans-serif" font-weight="800" font-size="9" text-anchor="middle" dominant-baseline="central">
+        <text x="30" y="5.5" fill="#FF5470">N</text><text x="30" y="54.5" fill="#F4F6FF">S</text>
+        <text x="55" y="30" fill="#F4F6FF">E</text><text x="5" y="30" fill="#F4F6FF">W</text>
+      </g>
+    </g></svg>
+  </button>
   <div id="summary"></div>
 
   <div class="fabs" id="fabs">
@@ -769,6 +786,8 @@ function buildMap(){
     renderAll();
   });
   map.on('click', onMapClick);
+  const rose = () => { $('#roseG').setAttribute('transform', `rotate(${-map.getBearing()} 30 30)`); };
+  map.on('rotate', rose); map.on('load', rose);
   map.on('zoomend', () => { if (mode === 'sun') renderSun(); });
   const stop = () => { spinning = false; };
   map.on('mousedown', stop); map.on('touchstart', stop); map.on('wheel', stop);
@@ -1398,6 +1417,7 @@ function sunPlay(){
   }, 90);
 }
 $('#btnSun').onclick = () => enterSun();
+$('#compass').onclick = () => { if (map) map.easeTo({ bearing: 0, duration: 400 }); };
 $('#sunClose').onclick = () => exitSun();
 $('#sunPlay').onclick = () => sunPlay();
 $('#sunTime').oninput = e => { sunStop(); sunSt.min = +e.target.value; $('#sunClock').textContent = hm(sunSt.min); renderSun(); };
