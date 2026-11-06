@@ -112,6 +112,12 @@ svg{display:block}
 #drawBar .btns button{flex:1;height:46px;border-radius:14px;font-weight:700;font-size:14px;background:rgba(255,255,255,.1);border:1px solid var(--line)}
 #drawBar .btns .go{background:linear-gradient(95deg,#FFD66B,#FF8A3D);color:#1B0E00;border:0}
 #drawBar .btns button:disabled{opacity:.4}
+#dAuto{display:none;width:100%;height:44px;margin-bottom:8px;border-radius:14px;font-weight:700;font-size:14px;background:rgba(46,230,168,.14);border:1px solid rgba(46,230,168,.55);color:var(--txt);align-items:center;justify-content:center;gap:8px}
+#dAuto.on{background:rgba(46,230,168,.32)}
+.vtx{width:30px;height:30px;display:grid;place-items:center;cursor:grab;touch-action:none}
+.vtx:after{content:"";width:12px;height:12px;border-radius:50%;background:#fff;border:2.5px solid #FF6B3D;box-shadow:0 1px 4px rgba(0,0,0,.6)}
+.vtx.first:after{width:18px;height:18px;background:#FFB020}
+.vtxMove{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:18px;background:rgba(11,16,38,.85);border:1.5px solid #FFB020;color:#FFD66B;cursor:grab;touch-action:none;box-shadow:0 2px 8px rgba(0,0,0,.5)}
 .crosshair{position:absolute;left:50%;top:50%;width:36px;height:36px;margin:-18px 0 0 -18px;pointer-events:none;z-index:3;display:none}
 .edgeLbl{font-size:11px;font-weight:700;padding:2px 6px;border-radius:7px;background:rgba(11,16,38,.85);color:#FFD66B;border:1px solid rgba(255,176,32,.5);pointer-events:none;white-space:nowrap}
 .pin{width:22px;height:22px;border-radius:50%;background:var(--sun);border:3px solid #fff;box-shadow:0 0 0 6px rgba(255,176,32,.35),0 4px 10px rgba(0,0,0,.5)}
@@ -243,7 +249,7 @@ h4{margin:20px 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:1.2
       Open project <span class="badge" id="projCount">0</span>
     </button>
   </div>
-  <div class="ver">v0.4.1 · Remote: location, roof, obstacles & parapets, layout, sun path & shading</div>
+  <div class="ver">v0.5 · Remote: location, roof, obstacles & parapets, layout, sun path & shading</div>
 </section>
 
 <!-- ============ PROJECTS ============ -->
@@ -295,6 +301,7 @@ h4{margin:20px 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:1.2
   </div>
 
   <div id="drawBar">
+    <button id="dAuto">🏠 Detect building outline</button>
     <div class="info"><span id="drawHint">Tap each roof corner. Tap the first point to close.</span><b id="drawStat"></b></div>
     <div class="btns">
       <button id="dUndo">Undo</button>
@@ -939,14 +946,14 @@ function startDraw(target){
   if (drawTarget === 'obstacle' && !project.areas.length){ toast('Outline the roof first, then add obstacles'); return; }
   if (!project.location && map.getZoom() < 15){ toast('First find the site: search or use your location'); $('#q').focus(); return; }
   if (map.getZoom() < 16.5) toast('Tip: zoom in closer for accurate corners');
-  exitSun(true); closeSheet(); mode = 'draw'; draft = []; selectedAreaId = null; selectedObsId = null;
+  exitSun(true); closeSheet(); mode = 'draw'; draft = []; autoPick = false; lastOsm = null; selectedAreaId = null; selectedObsId = null;
   $('#drawBar').style.borderColor = drawTarget === 'obstacle' ? 'rgba(255,84,112,.7)' : 'rgba(255,176,32,.5)';
   map.doubleClickZoom.disable();
   $('#drawBar').style.display = 'block'; $('#fabs').style.display = 'none'; $('#summary').style.display = 'none';
   updateDrawBar(); renderAll();
 }
 function exitDraw(silent){
-  mode = 'idle'; draft = [];
+  mode = 'idle'; draft = []; autoPick = false; autoBusy = false; lastOsm = null; clearHandles();
   if (map){ map.doubleClickZoom.enable(); }
   $('#drawBar').style.display = 'none'; $('#fabs').style.display = 'flex';
   if (!silent) renderAll();
@@ -956,12 +963,120 @@ function updateDrawBar(){
   if (draft.length >= 3){ const P = makeProj(centroid(draft)); stat += ` · ${fmt(areaM2(draft.map(P.fwd)), 1)} m²`; }
   $('#drawStat').textContent = stat;
   $('#dFinish').disabled = draft.length < 3; $('#dUndo').disabled = !draft.length;
-  $('#drawHint').textContent = draft.length < 3 ? (drawTarget === 'obstacle' ? 'Obstacle: tap its corners (tank, AC, stairs…)' : 'Tap each roof corner on the image.') : 'Tap the first point (orange) or “Close shape”.';
-  renderDraft(); renderEdgeLabels(draft, false);
+  $('#drawHint').textContent = autoPick ? 'Tap the building on the map…' : draft.length < 3 ? (drawTarget === 'obstacle' ? 'Obstacle: tap its corners (tank, AC, stairs…)' : 'Tap each roof corner — or detect it automatically.') : 'Drag corners to adjust, ✥ moves all. Then “Close shape”.';
+  const da = $('#dAuto'); da.style.display = drawTarget === 'roof' && !draft.length ? 'flex' : 'none'; da.classList.toggle('on', autoPick);
+  da.innerHTML = autoBusy ? '<span class="spinner"></span> Looking up buildings…' : autoPick ? '👆 Now tap the building (tap here to cancel)' : '🏠 Detect building outline';
+  renderDraft(); renderEdgeLabels(draft, false); renderHandles();
 }
+// Draggable corner handles for the shape being drawn (+ a move-all handle)
+let handles = [], autoPick = false, autoBusy = false;
+function clearHandles(){ handles.forEach(m => m.remove()); handles = []; }
+function renderHandles(){
+  clearHandles(); if (mode !== 'draw' || !map) return;
+  const live = () => { renderDraft(); renderEdgeLabels(draft, false); const P = makeProj(centroid(draft)); $('#drawStat').textContent = `${draft.length} pts` + (draft.length >= 3 ? ` · ${fmt(areaM2(draft.map(P.fwd)), 1)} m²` : ''); };
+  draft.forEach((p, i) => {
+    const el = document.createElement('div'); el.className = 'vtx' + (i === 0 && draft.length >= 3 ? ' first' : '');
+    const mk = new maplibregl.Marker({ element: el, draggable: true }).setLngLat(p).addTo(map);
+    let moved = false;
+    mk.on('dragstart', () => { moved = true; });
+    mk.on('drag', () => { const ll = mk.getLngLat(); draft[i] = [ll.lng, ll.lat]; live(); });
+    mk.on('dragend', () => { setTimeout(() => { moved = false; }, 50); updateDrawBar(); });
+    el.addEventListener('click', ev => { ev.stopPropagation(); if (!moved && i === 0 && draft.length >= 3) finishDraw(); });
+    handles.push(mk);
+  });
+  if (draft.length >= 3){
+    const el = document.createElement('div'); el.className = 'vtxMove'; el.textContent = '✥'; el.title = 'Drag to move the whole outline';
+    const mk = new maplibregl.Marker({ element: el, draggable: true }).setLngLat(centroid(draft)).addTo(map);
+    let start = null, base = null;
+    mk.on('dragstart', () => { start = mk.getLngLat(); base = draft.map(p => p.slice()); handles.forEach(h => h !== mk && (h.getElement().style.visibility = 'hidden')); });
+    mk.on('drag', () => { const ll = mk.getLngLat(), dx = ll.lng - start.lng, dy = ll.lat - start.lat; draft = base.map(p => [p[0] + dx, p[1] + dy]); live(); });
+    mk.on('dragend', () => updateDrawBar());
+    el.addEventListener('click', ev => ev.stopPropagation());
+    handles.push(mk);
+  }
+}
+// ---------------- Building outline from OpenStreetMap ----------------
+const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
+async function fetchBuildings(lng, lat, r = 45){
+  const q = `[out:json][timeout:20];(way["building"](around:${r},${lat},${lng});relation["building"](around:${r},${lat},${lng});way["building:part"](around:${r},${lat},${lng}););out geom tags;`;
+  let lastErr;
+  for (const url of OVERPASS){
+    const ac = new AbortController(), to = setTimeout(() => ac.abort(), 15000);
+    try{
+      const res = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ac.signal });
+      clearTimeout(to);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return parseBuildings(await res.json());
+    }catch(e){ clearTimeout(to); lastErr = e; }
+  }
+  throw lastErr || new Error('unavailable');
+}
+function parseBuildings(js){
+  const out = [];
+  const closedRing = g => { if (!g || g.length < 4) return null; const r = g.map(p => [p.lon, p.lat]); const a = r[0], b = r[r.length - 1]; if (Math.abs(a[0] - b[0]) > 1e-9 || Math.abs(a[1] - b[1]) > 1e-9) return null; r.pop(); return r.length >= 3 ? r : null; };
+  (js.elements || []).forEach(el => {
+    const t = el.tags || {};
+    let rings = [];
+    if (el.type === 'way') rings = [closedRing(el.geometry)];
+    else if (el.type === 'relation') rings = (el.members || []).filter(m => m.role === 'outer').map(m => closedRing(m.geometry));
+    rings.filter(Boolean).forEach(ring => {
+      const num = v => { const x = parseFloat(String(v ?? '').replace(',', '.')); return isNaN(x) ? null : x; };
+      out.push({ id: el.type + '/' + el.id, ring, part: !!t['building:part'], levels: num(t['building:levels']), height: num(t.height), minHeight: num(t.min_height), name: t.name || t['addr:housenumber'] || '' });
+    });
+  });
+  return out;
+}
+// Remove near-duplicate and almost-collinear corners (keeps sharp roof corners, drops curve noise)
+function simplifyRing(ring, tol = 0.15){
+  const P = makeProj(centroid(ring)); let pts = ring.map(P.fwd), changed = true;
+  while (changed && pts.length > 3){
+    changed = false;
+    for (let i = 0; i < pts.length && pts.length > 3; i++){
+      const a = pts[(i - 1 + pts.length) % pts.length], b = pts[i], c = pts[(i + 1) % pts.length];
+      if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.05 || distSeg(b, a, c) < tol){ pts.splice(i, 1); changed = true; i--; }
+    }
+  }
+  return pts.map(P.inv);
+}
+function pickBuilding(list, ll){
+  const whole = list.filter(b => !b.part), pool = whole.length ? whole : list;
+  const inside = pool.filter(b => pip(ll, b.ring));
+  const P = makeProj(ll), area = b => areaM2(b.ring.map(P.fwd));
+  if (inside.length) return inside.sort((a, b) => area(a) - area(b))[0];
+  let best = null, bd = 12;   // nearest within 12 m
+  pool.forEach(b => { const r = b.ring.map(P.fwd); let d = Infinity; r.forEach((p, i) => { d = Math.min(d, distSeg([0, 0], p, r[(i + 1) % r.length])); }); if (d < bd){ bd = d; best = b; } });
+  return best;
+}
+async function autoDetectAt(ll){
+  autoPick = false; autoBusy = true; updateDrawBar();
+  try{
+    const list = await fetchBuildings(ll[0], ll[1]);
+    autoBusy = false;
+    if (mode !== 'draw') return;
+    const b = pickBuilding(list, ll);
+    if (!b){ updateDrawBar(); return toast('No building mapped here in OpenStreetMap — tap the corners by hand', 3600); }
+    draft = simplifyRing(b.ring);
+    lastOsm = { id: b.id, levels: b.levels, height: b.height };
+    updateDrawBar();
+    const P = makeProj(centroid(draft));
+    const info = b.height ? `${fmt(b.height, 1)} m high` : b.levels ? `${b.levels} floors` : 'height unknown';
+    toast(`Building found: ${fmt(areaM2(draft.map(P.fwd)), 0)} m² · ${info}. Check it against the image, drag corners if needed, then “Close shape”.`, 5200);
+  }catch(e){
+    autoBusy = false; updateDrawBar();
+    toast('Building lookup unavailable (offline or server busy) — tap the corners by hand', 3600);
+  }
+}
+let lastOsm = null;
+$('#dAuto').onclick = () => {
+  if (autoBusy) return;
+  if (map.getZoom() < 16){ toast('Zoom in on the building first'); return; }
+  autoPick = !autoPick; updateDrawBar();
+};
 function onMapClick(e){
   if (mode === 'sun') return;
   if (mode === 'draw'){
+    if (autoPick) return autoDetectAt([e.lngLat.lng, e.lngLat.lat]);
+    if (autoBusy) return;
     if (draft.length >= 3){
       const p0 = map.project(draft[0]);
       if (Math.hypot(p0.x - e.point.x, p0.y - e.point.y) < 26) return finishDraw();
@@ -976,7 +1091,7 @@ function onMapClick(e){
   if (f.length){ selectedObsId = null; selectedAreaId = f[0].properties.areaId || f[0].properties.id; renderAll(); openPanels(); }
   else if (selectedAreaId || selectedObsId){ selectedAreaId = null; selectedObsId = null; closeSheet(); renderAll(); }
 }
-$('#dUndo').onclick = () => { draft.pop(); updateDrawBar(); };
+$('#dUndo').onclick = () => { draft.pop(); if (!draft.length) lastOsm = null; updateDrawBar(); };
 $('#dCancel').onclick = () => exitDraw();
 $('#dFinish').onclick = () => finishDraw();
 function finishDraw(){
@@ -993,6 +1108,7 @@ function finishDraw(){
   }
   if (areaM2(pts) < 2) return toast('Area too small');
   const area = { id: uid(), name: 'Area ' + (project.areas.length + 1), ring: draft.slice(), settings: defaultSettings(), modules: [], stats: null };
+  if (lastOsm) area.osm = lastOsm;
   project.areas.push(area); selectedAreaId = area.id;
   exitDraw(true); markDirty(); renderAll();
   toast(`${area.name}: ${fmt(areaM2(pts), 1)} m² — now choose the module`);
