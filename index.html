@@ -112,12 +112,6 @@ svg{display:block}
 #drawBar .btns button{flex:1;height:46px;border-radius:14px;font-weight:700;font-size:14px;background:rgba(255,255,255,.1);border:1px solid var(--line)}
 #drawBar .btns .go{background:linear-gradient(95deg,#FFD66B,#FF8A3D);color:#1B0E00;border:0}
 #drawBar .btns button:disabled{opacity:.4}
-#dAuto{display:none;width:100%;height:44px;margin-bottom:8px;border-radius:14px;font-weight:700;font-size:14px;background:rgba(46,230,168,.14);border:1px solid rgba(46,230,168,.55);color:var(--txt);align-items:center;justify-content:center;gap:8px}
-#dAuto.on{background:rgba(46,230,168,.32)}
-.vtx{width:30px;height:30px;display:grid;place-items:center;cursor:grab;touch-action:none}
-.vtx:after{content:"";width:12px;height:12px;border-radius:50%;background:#fff;border:2.5px solid #FF6B3D;box-shadow:0 1px 4px rgba(0,0,0,.6)}
-.vtx.first:after{width:18px;height:18px;background:#FFB020}
-.vtxMove{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:18px;background:rgba(11,16,38,.85);border:1.5px solid #FFB020;color:#FFD66B;cursor:grab;touch-action:none;box-shadow:0 2px 8px rgba(0,0,0,.5)}
 .crosshair{position:absolute;left:50%;top:50%;width:36px;height:36px;margin:-18px 0 0 -18px;pointer-events:none;z-index:3;display:none}
 .edgeLbl{font-size:11px;font-weight:700;padding:2px 6px;border-radius:7px;background:rgba(11,16,38,.85);color:#FFD66B;border:1px solid rgba(255,176,32,.5);pointer-events:none;white-space:nowrap}
 .pin{width:22px;height:22px;border-radius:50%;background:var(--sun);border:3px solid #fff;box-shadow:0 0 0 6px rgba(255,176,32,.35),0 4px 10px rgba(0,0,0,.5)}
@@ -249,7 +243,7 @@ h4{margin:20px 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:1.2
       Open project <span class="badge" id="projCount">0</span>
     </button>
   </div>
-  <div class="ver">v0.5.2 · Remote: location, roof, obstacles & parapets, layout, sun path & shading</div>
+  <div class="ver">v0.4.1 · Remote: location, roof, obstacles & parapets, layout, sun path & shading</div>
 </section>
 
 <!-- ============ PROJECTS ============ -->
@@ -301,7 +295,6 @@ h4{margin:20px 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:1.2
   </div>
 
   <div id="drawBar">
-    <button id="dAuto">🏠 Detect building outline</button>
     <div class="info"><span id="drawHint">Tap each roof corner. Tap the first point to close.</span><b id="drawStat"></b></div>
     <div class="btns">
       <button id="dUndo">Undo</button>
@@ -773,9 +766,7 @@ function buildMap(){
   });
   map.on('load', () => {
     const empty = { type: 'FeatureCollection', features: [] };
-    ['areas', 'modules', 'draft', 'obstacles', 'obsShade', 'parapets', 'sunShade', 'sunMods', 'sunRay', 'neighbours'].forEach(s => map.addSource(s, { type: 'geojson', data: empty }));
-    map.addLayer({ id: 'nb-fill', type: 'fill', source: 'neighbours', paint: { 'fill-color': ['match', ['get', 'k'], 'tall', 'rgba(167,139,250,0.30)', 'unk', 'rgba(250,204,21,0.14)', 'rgba(148,163,184,0.10)'] } });
-    map.addLayer({ id: 'nb-line', type: 'line', source: 'neighbours', paint: { 'line-color': ['match', ['get', 'k'], 'tall', '#A78BFA', 'unk', '#FACC15', '#94A3B8'], 'line-width': ['match', ['get', 'k'], 'tall', 2, 1], 'line-dasharray': [2, 1.5] } });
+    ['areas', 'modules', 'draft', 'obstacles', 'obsShade', 'parapets', 'sunShade', 'sunMods', 'sunRay'].forEach(s => map.addSource(s, { type: 'geojson', data: empty }));
     map.addLayer({ id: 'areas-fill', type: 'fill', source: 'areas', paint: { 'fill-color': ['case', ['get', 'sel'], 'rgba(255,176,32,0.20)', 'rgba(46,230,168,0.14)'] } });
     map.addLayer({ id: 'modules-fill', type: 'fill', source: 'modules', paint: { 'fill-color': ['case', ['==', ['get', 'o'], 'L'], '#2B5BD7', '#1C3FAA'], 'fill-opacity': 0.93 } });
     map.addLayer({ id: 'modules-line', type: 'line', source: 'modules', paint: { 'line-color': '#A9C8FF', 'line-width': ['interpolate', ['linear'], ['zoom'], 17, 0.3, 21, 1.4] } });
@@ -898,10 +889,7 @@ function renderAll(){
   map.getSource('modules').setData({ type: 'FeatureCollection', features: mods });
   const obs = project.obstacles || [];
   map.getSource('obstacles').setData({ type: 'FeatureCollection', features: obs.map(o => ({ type: 'Feature', properties: { id: o.id, sel: o.id === selectedObsId }, geometry: { type: 'Polygon', coordinates: [ringClosed(o.ring)] } })) });
-  map.getSource('obsShade').setData({ type: 'FeatureCollection', features: obs.concat(nbObstacles()).map(o => { const r = obstacleShadowLL(o, o.ring[0][1], project.shadeWin || 0); return r ? { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ringClosed(r)] } } : null; }).filter(Boolean) });
-  const nbs = project.neighbours || [], rh = siteRoofH();
-  map.getSource('neighbours').setData({ type: 'FeatureCollection', features: nbs.map(n => ({ type: 'Feature', properties: { id: n.id, k: n.h == null ? 'unk' : (rh != null && n.h - rh > 0.3) ? 'tall' : 'low' }, geometry: { type: 'Polygon', coordinates: [ringClosed(n.ring)] } })) });
-  renderNbLabels();
+  map.getSource('obsShade').setData({ type: 'FeatureCollection', features: obs.map(o => { const r = obstacleShadowLL(o, o.ring[0][1], project.shadeWin || 0); return r ? { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ringClosed(r)] } } : null; }).filter(Boolean) });
   const par = [];
   project.areas.forEach(a => (a.settings.parapets || []).forEach((hh, i) => { if (Number(hh) > 0 && i < a.ring.length) par.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [a.ring[i], a.ring[(i + 1) % a.ring.length]] } }); }));
   map.getSource('parapets').setData({ type: 'FeatureCollection', features: par });
@@ -951,14 +939,14 @@ function startDraw(target){
   if (drawTarget === 'obstacle' && !project.areas.length){ toast('Outline the roof first, then add obstacles'); return; }
   if (!project.location && map.getZoom() < 15){ toast('First find the site: search or use your location'); $('#q').focus(); return; }
   if (map.getZoom() < 16.5) toast('Tip: zoom in closer for accurate corners');
-  exitSun(true); closeSheet(); mode = 'draw'; draft = []; autoPick = false; lastOsm = null; selectedAreaId = null; selectedObsId = null;
+  exitSun(true); closeSheet(); mode = 'draw'; draft = []; selectedAreaId = null; selectedObsId = null;
   $('#drawBar').style.borderColor = drawTarget === 'obstacle' ? 'rgba(255,84,112,.7)' : 'rgba(255,176,32,.5)';
   map.doubleClickZoom.disable();
   $('#drawBar').style.display = 'block'; $('#fabs').style.display = 'none'; $('#summary').style.display = 'none';
   updateDrawBar(); renderAll();
 }
 function exitDraw(silent){
-  mode = 'idle'; draft = []; autoPick = false; autoBusy = false; lastOsm = null; clearHandles();
+  mode = 'idle'; draft = [];
   if (map){ map.doubleClickZoom.enable(); }
   $('#drawBar').style.display = 'none'; $('#fabs').style.display = 'flex';
   if (!silent) renderAll();
@@ -968,257 +956,12 @@ function updateDrawBar(){
   if (draft.length >= 3){ const P = makeProj(centroid(draft)); stat += ` · ${fmt(areaM2(draft.map(P.fwd)), 1)} m²`; }
   $('#drawStat').textContent = stat;
   $('#dFinish').disabled = draft.length < 3; $('#dUndo').disabled = !draft.length;
-  $('#drawHint').textContent = autoPick ? 'Tap the building on the map…' : draft.length < 3 ? (drawTarget === 'obstacle' ? 'Obstacle: tap its corners (tank, AC, stairs…)' : 'Tap each roof corner — or detect it automatically.') : 'Drag corners to adjust, ✥ moves all. Then “Close shape”.';
-  const da = $('#dAuto'); da.style.display = drawTarget === 'roof' && !draft.length ? 'flex' : 'none'; da.classList.toggle('on', autoPick);
-  da.innerHTML = autoBusy ? '<span class="spinner"></span> Looking up buildings…' : autoPick ? '👆 Now tap the building (tap here to cancel)' : '🏠 Detect building outline';
-  renderDraft(); renderEdgeLabels(draft, false); renderHandles();
+  $('#drawHint').textContent = draft.length < 3 ? (drawTarget === 'obstacle' ? 'Obstacle: tap its corners (tank, AC, stairs…)' : 'Tap each roof corner on the image.') : 'Tap the first point (orange) or “Close shape”.';
+  renderDraft(); renderEdgeLabels(draft, false);
 }
-// Draggable corner handles for the shape being drawn (+ a move-all handle)
-let handles = [], autoPick = false, autoBusy = false;
-function clearHandles(){ handles.forEach(m => m.remove()); handles = []; }
-function renderHandles(){
-  clearHandles(); if (mode !== 'draw' || !map) return;
-  const live = () => { renderDraft(); renderEdgeLabels(draft, false); const P = makeProj(centroid(draft)); $('#drawStat').textContent = `${draft.length} pts` + (draft.length >= 3 ? ` · ${fmt(areaM2(draft.map(P.fwd)), 1)} m²` : ''); };
-  draft.forEach((p, i) => {
-    const el = document.createElement('div'); el.className = 'vtx' + (i === 0 && draft.length >= 3 ? ' first' : '');
-    const mk = new maplibregl.Marker({ element: el, draggable: true }).setLngLat(p).addTo(map);
-    let moved = false;
-    mk.on('dragstart', () => { moved = true; });
-    mk.on('drag', () => { const ll = mk.getLngLat(); draft[i] = [ll.lng, ll.lat]; live(); });
-    mk.on('dragend', () => { setTimeout(() => { moved = false; }, 50); updateDrawBar(); });
-    el.addEventListener('click', ev => { ev.stopPropagation(); if (!moved && i === 0 && draft.length >= 3) finishDraw(); });
-    handles.push(mk);
-  });
-  if (draft.length >= 3){
-    const el = document.createElement('div'); el.className = 'vtxMove'; el.textContent = '✥'; el.title = 'Drag to move the whole outline';
-    const mk = new maplibregl.Marker({ element: el, draggable: true }).setLngLat(centroid(draft)).addTo(map);
-    let start = null, base = null;
-    mk.on('dragstart', () => { start = mk.getLngLat(); base = draft.map(p => p.slice()); handles.forEach(h => h !== mk && (h.getElement().style.visibility = 'hidden')); });
-    mk.on('drag', () => { const ll = mk.getLngLat(), dx = ll.lng - start.lng, dy = ll.lat - start.lat; draft = base.map(p => [p[0] + dx, p[1] + dy]); live(); });
-    mk.on('dragend', () => updateDrawBar());
-    el.addEventListener('click', ev => ev.stopPropagation());
-    handles.push(mk);
-  }
-}
-// ---------------- Neighbouring buildings (near shading) ----------------
-// project.site = { roofH: m above ground, roofHsrc: 'osm'|'user', nbAvoid, nbFetched }
-// project.neighbours = [{ id, ring, h: m above ground | null, src: 'osm'|'user', levels }]
-const FLOOR_H = 3.0;
-const osmHeight = b => b.height != null ? b.height : b.levels != null ? b.levels * FLOOR_H : null;
-function siteSet(o){ project.site = Object.assign({ roofH: null, roofHsrc: null, nbAvoid: true, nbFetched: 0 }, project.site || {}, o); markDirty(); }
-const siteRoofH = () => project && project.site && project.site.roofH != null ? Number(project.site.roofH) : null;
-// Neighbours taller than our roof, as obstacles whose height is measured from our roof level
-function nbObstacles(){
-  const rh = siteRoofH(); if (rh == null) return [];
-  return (project.neighbours || []).filter(n => n.h != null && n.h - rh > 0.3).map(n => ({ ring: n.ring, height: n.h - rh, clearance: 0, nb: true }));
-}
-const layoutObstacles = () => (project.obstacles || []).concat(project.site && project.site.nbAvoid === false ? [] : nbObstacles());
-function nbInfo(n){
-  const a = project.areas[0]; if (!a) return { d: 0, dir: '' };
-  const P = makeProj(centroid(a.ring)), r = a.ring.map(P.fwd), q = n.ring.map(P.fwd), c = centroid(q);
-  return { d: polyDist(r, q), dir: compass(Math.atan2(c[0], c[1])) };
-}
-async function findNeighbours(auto){
-  if (!project.areas.length) return toast('Outline the roof first');
-  const proj0 = project, O = centroid(project.areas.flatMap(a => a.ring));
-  toast('Looking up neighbouring buildings…', 8000);
-  let list;
-  try{ list = await fetchBuildings(O[0], O[1], 110); }
-  catch(e){ toast('Neighbour lookup failed — ' + e.message, 5200); return; }
-  if (project !== proj0) return;   // user switched project meanwhile
-  const P = makeProj(O), roofs = project.areas.map(a => a.ring.map(P.fwd));
-  const own = [], nb = [];
-  list.forEach(b => { const q = b.ring.map(P.fwd); (roofs.some(r => overlaps(r, q)) ? own : nb).push(b); });
-  // our roof height from the building we stand on (unless the user set it)
-  if (project.site?.roofHsrc !== 'user'){
-    const hs = own.filter(b => !b.part).map(osmHeight).filter(h => h != null);
-    if (hs.length) siteSet({ roofH: Math.max(...hs), roofHsrc: 'osm' });
-  }
-  const keep = new Map((project.neighbours || []).filter(n => n.src === 'user').map(n => [n.id, n]));
-  project.neighbours = nb.filter(b => !b.part || osmHeight(b) != null)
-    .map(b => keep.get(b.id) || { id: b.id, ring: simplifyRing(b.ring, 0.3), h: osmHeight(b), src: 'osm', levels: b.levels });
-  siteSet({ nbFetched: Date.now() });
-  relayoutAll(); renderAll(); if ($('#sheet').classList.contains('open') && areaById(selectedAreaId)) renderSheet(true);
-  const rh = siteRoofH(), tall = nbObstacles().length, unk = project.neighbours.filter(n => n.h == null).length;
-  toast(!project.neighbours.length ? 'No neighbouring buildings mapped nearby'
-    : rh == null ? `${project.neighbours.length} neighbouring buildings found — set your roof height (Panels → ③) to use them for shading`
-    : `${project.neighbours.length} neighbours found (${bldSrc}) · ${tall} taller than your roof${unk ? ` · ${unk} with unknown height (tap them to set)` : ''}`, 4800);
-}
-async function editNeighbour(id){
-  const n = (project.neighbours || []).find(x => x.id === id); if (!n) return;
-  const i = nbInfo(n), rh = siteRoofH();
-  const v = await modal({ title: 'Neighbouring building', text: `${fmt(i.d, 1)} m away to the ${i.dir}. Height above ground in metres (≈ ${FLOOR_H} m per floor)${rh != null ? ` — your roof is at ${fmt(rh, 1)} m` : ''}. Leave empty if unknown.`, input: n.h != null ? String(n.h) : '', ok: 'Save' });
-  if (v === null) return;
-  const x = parseFloat(String(v).replace(',', '.'));
-  n.h = v === '' || isNaN(x) ? null : Math.max(0, x); n.src = 'user';
-  markDirty(); relayoutAll(); renderAll(); if ($('#sheet').classList.contains('open') && areaById(selectedAreaId)) renderSheet(true);
-}
-let nbMarkers = [];
-function renderNbLabels(){
-  nbMarkers.forEach(m => m.remove()); nbMarkers = [];
-  const rh = siteRoofH(); if (!map || mode === 'draw' || rh == null) return;
-  (project.neighbours || []).forEach(n => {
-    if (n.h == null || n.h - rh <= 0.3) return;
-    const el = document.createElement('div'); el.className = 'edgeLbl'; el.style.borderColor = '#A78BFA'; el.style.color = '#DDD6FE';
-    el.textContent = `+${fmt(n.h - rh, 1)} m`;
-    nbMarkers.push(new maplibregl.Marker({ element: el }).setLngLat(centroid(n.ring)).addTo(map));
-  });
-}
-function nbSection(){
-  const st = project.site || {}, rh = siteRoofH(), nbs = project.neighbours || [];
-  const rows = nbs.map(n => ({ n, i: nbInfo(n), rel: n.h != null && rh != null ? n.h - rh : null }))
-    .filter(x => x.n.h == null || x.rel == null || x.rel > 0.3)
-    .sort((a, b) => (b.rel ?? -1) - (a.rel ?? -1) || a.i.d - b.i.d).slice(0, 8);
-  const low = nbs.filter(n => n.h != null && rh != null && n.h - rh <= 0.3).length;
-  return `
-    <span class="lbl2" style="margin-top:18px">Neighbouring buildings (near shading)</span>
-    <div class="grid2" style="align-items:end">
-      <div><div class="inpLbl">Your roof height above ground${st.roofHsrc === 'osm' ? ' · from map' : ''}</div><div class="inp"><input inputmode="decimal" id="roofH" value="${rh ?? ''}" placeholder="e.g. 15"><span>m</span></div></div>
-      <button class="sbtn" id="nbFind" style="height:44px;justify-content:center">🏙 ${st.nbFetched ? 'Refresh' : 'Find'} neighbours</button>
-    </div>
-    ${nbs.length ? `<div style="margin-top:8px">${rows.map(({ n, i, rel }) => `<div class="edgeRow"><div class="e" style="color:${rel != null ? '#A78BFA' : '#FACC15'}">${rel != null ? '+' + fmt(rel, 1) : '?'}</div><div>${fmt(i.d, 0)} m ${i.dir}<small>${rel != null ? 'taller — casts shade' : n.h == null ? 'height unknown' : 'set your roof height'}${n.src === 'user' ? ' · edited' : ''}</small></div><div class="inp"><input inputmode="decimal" data-nbh="${esc(n.id)}" value="${n.h ?? ''}" placeholder="?"><span>m</span></div></div>`).join('')}</div>
-      <div class="note">${nbs.length} building(s) within ~100 m${low ? ` · ${low} not taller than your roof (ignored)` : ''}. Heights are above ground (≈ ${FLOOR_H} m per floor). You can also tap a dashed building on the map to edit it.</div>
-      <span class="lbl2">Keep panels out of neighbours' shade (no-shade window)</span>
-      ${seg('nbAvoid', [['on', 'On'], ['off', 'Off — show only']], st.nbAvoid === false ? 'off' : 'on')}`
-    : `<div class="note">${st.nbFetched ? 'No neighbouring buildings found in OpenStreetMap.' : 'Finds the buildings around yours and their heights, so taller neighbours shade your roof in the layout and in the sun simulation.'}</div>`}`;
-}
-function wireNbSection(){
-  const rf = $('#roofH'); if (!rf) return;
-  rf.onchange = () => { const x = parseFloat(rf.value.replace(',', '.')); siteSet({ roofH: rf.value.trim() === '' || isNaN(x) ? null : Math.max(0, x), roofHsrc: 'user' }); relayoutAll(); renderAll(); renderSheet(true); };
-  $('#nbFind').onclick = () => findNeighbours(false);
-  document.querySelectorAll('[data-nbh]').forEach(i => i.onchange = () => {
-    const n = project.neighbours.find(x => x.id === i.dataset.nbh), x = parseFloat(i.value.replace(',', '.'));
-    n.h = i.value.trim() === '' || isNaN(x) ? null : Math.max(0, x); n.src = 'user'; markDirty(); relayoutAll(); renderAll(); renderSheet(true);
-  });
-}
-// ---------------- Building outline from OpenStreetMap ----------------
-const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
-// Buildings around a point. 1) Overpass (exact OSM geometry; two servers asked in parallel),
-// 2) fallback: OpenFreeMap vector tiles (fast CDN, ~0.6 m precision, heights included).
-let bldSrc = '';
-const errTxt = e => e?.name === 'AbortError' ? 'timeout' : e instanceof TypeError ? 'no connection / blocked' : (e?.message || 'error');
-async function overpassBuildings(lng, lat, r){
-  const q = `[out:json][timeout:15];(way["building"](around:${r},${lat},${lng});relation["building"](around:${r},${lat},${lng});way["building:part"](around:${r},${lat},${lng}););out geom;`;
-  const acs = [];
-  const one = async url => {
-    const ac = new AbortController(); acs.push(ac); const to = setTimeout(() => ac.abort(), 9000);
-    try{
-      const res = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ac.signal });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const js = await res.json();
-      if (js.remark && /error|timed out|rate/i.test(js.remark) && !(js.elements || []).length) throw new Error('server busy');
-      return parseBuildings(js);
-    } finally { clearTimeout(to); }
-  };
-  try{ const out = await Promise.any(OVERPASS.slice(0, 2).map(one)); acs.forEach(a => a.abort()); return out; }
-  catch(agg){ throw new Error((agg.errors || [agg]).map(errTxt).join(' / ')); }
-}
-const OFM = 'https://tiles.openfreemap.org/planet';
-async function tileBuildings(lng, lat, r){
-  if (!map) throw new Error('map not ready');
-  if (!map.getSource('ofm')){
-    map.addSource('ofm', { type: 'vector', url: OFM });
-    map.addLayer({ id: 'ofm-bld', type: 'fill', source: 'ofm', 'source-layer': 'building', minzoom: 13, paint: { 'fill-color': '#000', 'fill-opacity': 0 } }, 'nb-fill');
-  }
-  const t0 = Date.now();
-  let feats = [];
-  while (Date.now() - t0 < 12000){
-    map.triggerRepaint();
-    await new Promise(res => { let done = false; const f = () => { if (!done){ done = true; res(); } }; map.once('idle', f); setTimeout(f, 1500); });
-    feats = map.querySourceFeatures('ofm', { sourceLayer: 'building' });
-    if (feats.length && map.isSourceLoaded('ofm')) break;
-    if (map.getZoom() < 13) throw new Error('zoom in');
-  }
-  if (!feats.length) throw new Error(map.isSourceLoaded('ofm') ? 'no buildings in tiles' : 'tiles timeout');
-  const P = makeProj([lng, lat]), seen = new Set(), out = [];
-  feats.forEach(f => {
-    const g = f.geometry, polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
-    polys.forEach(pc => {
-      const ring = pc[0].slice(0, -1); if (ring.length < 3) return;
-      const key = (f.id ?? '') + ':' + ring.map(p => p[0].toFixed(6) + ',' + p[1].toFixed(6)).join(';');
-      if (seen.has(key)) return; seen.add(key);
-      const q = ring.map(P.fwd); let d = pip([0, 0], q) ? 0 : Infinity;
-      if (d) q.forEach((p, i) => { d = Math.min(d, distSeg([0, 0], p, q[(i + 1) % q.length])); });
-      if (d > r) return;
-      const rh = Number(f.properties.render_height);
-      // OpenMapTiles uses 5 m when the height is unknown
-      out.push({ id: 't/' + (f.id ?? key.length + ':' + out.length), ring, part: false, levels: null, height: rh && rh !== 5 ? rh : null, name: '' });
-    });
-  });
-  return out;
-}
-async function fetchBuildings(lng, lat, r = 45){
-  let e1;
-  try{ const l = await overpassBuildings(lng, lat, r); bldSrc = 'OpenStreetMap'; return l; } catch(e){ e1 = e; }
-  try{ const l = await tileBuildings(lng, lat, r); bldSrc = 'OpenFreeMap tiles'; return l; }
-  catch(e2){ throw new Error(`OSM server: ${e1.message}; map tiles: ${errTxt(e2)}`); }
-}
-function parseBuildings(js){
-  const out = [];
-  const closedRing = g => { if (!g || g.length < 4) return null; const r = g.map(p => [p.lon, p.lat]); const a = r[0], b = r[r.length - 1]; if (Math.abs(a[0] - b[0]) > 1e-9 || Math.abs(a[1] - b[1]) > 1e-9) return null; r.pop(); return r.length >= 3 ? r : null; };
-  (js.elements || []).forEach(el => {
-    const t = el.tags || {};
-    let rings = [];
-    if (el.type === 'way') rings = [closedRing(el.geometry)];
-    else if (el.type === 'relation') rings = (el.members || []).filter(m => m.role === 'outer').map(m => closedRing(m.geometry));
-    rings.filter(Boolean).forEach(ring => {
-      const num = v => { const x = parseFloat(String(v ?? '').replace(',', '.')); return isNaN(x) ? null : x; };
-      out.push({ id: el.type + '/' + el.id, ring, part: !!t['building:part'], levels: num(t['building:levels']), height: num(t.height), minHeight: num(t.min_height), name: t.name || t['addr:housenumber'] || '' });
-    });
-  });
-  return out;
-}
-// Remove near-duplicate and almost-collinear corners (keeps sharp roof corners, drops curve noise)
-function simplifyRing(ring, tol = 0.15){
-  const P = makeProj(centroid(ring)); let pts = ring.map(P.fwd), changed = true;
-  while (changed && pts.length > 3){
-    changed = false;
-    for (let i = 0; i < pts.length && pts.length > 3; i++){
-      const a = pts[(i - 1 + pts.length) % pts.length], b = pts[i], c = pts[(i + 1) % pts.length];
-      if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.05 || distSeg(b, a, c) < tol){ pts.splice(i, 1); changed = true; i--; }
-    }
-  }
-  return pts.map(P.inv);
-}
-function pickBuilding(list, ll){
-  const whole = list.filter(b => !b.part), pool = whole.length ? whole : list;
-  const inside = pool.filter(b => pip(ll, b.ring));
-  const P = makeProj(ll), area = b => areaM2(b.ring.map(P.fwd));
-  if (inside.length) return inside.sort((a, b) => area(a) - area(b))[0];
-  let best = null, bd = 12;   // nearest within 12 m
-  pool.forEach(b => { const r = b.ring.map(P.fwd); let d = Infinity; r.forEach((p, i) => { d = Math.min(d, distSeg([0, 0], p, r[(i + 1) % r.length])); }); if (d < bd){ bd = d; best = b; } });
-  return best;
-}
-async function autoDetectAt(ll){
-  autoPick = false; autoBusy = true; updateDrawBar();
-  try{
-    const list = await fetchBuildings(ll[0], ll[1]);
-    autoBusy = false;
-    if (mode !== 'draw') return;
-    const b = pickBuilding(list, ll);
-    if (!b){ updateDrawBar(); return toast('No building mapped here in OpenStreetMap — tap the corners by hand', 3600); }
-    draft = simplifyRing(b.ring);
-    lastOsm = { id: b.id, levels: b.levels, height: b.height };
-    updateDrawBar();
-    const P = makeProj(centroid(draft));
-    const info = b.height ? `${fmt(b.height, 1)} m high` : b.levels ? `${b.levels} floors` : 'height unknown';
-    toast(`Building found (${bldSrc}): ${fmt(areaM2(draft.map(P.fwd)), 0)} m² · ${info}. Check it against the image, drag corners if needed, then “Close shape”.`, 5200);
-  }catch(e){
-    autoBusy = false; updateDrawBar();
-    toast('Building lookup failed (' + e.message + ') — tap the corners by hand', 6000);
-  }
-}
-let lastOsm = null;
-$('#dAuto').onclick = () => {
-  if (autoBusy) return;
-  if (map.getZoom() < 16){ toast('Zoom in on the building first'); return; }
-  autoPick = !autoPick; updateDrawBar();
-};
 function onMapClick(e){
   if (mode === 'sun') return;
   if (mode === 'draw'){
-    if (autoPick) return autoDetectAt([e.lngLat.lng, e.lngLat.lat]);
-    if (autoBusy) return;
     if (draft.length >= 3){
       const p0 = map.project(draft[0]);
       if (Math.hypot(p0.x - e.point.x, p0.y - e.point.y) < 26) return finishDraw();
@@ -1231,10 +974,9 @@ function onMapClick(e){
   if (fo.length){ openObstacle(fo[0].properties.id); return; }
   const f = map.queryRenderedFeatures(e.point, { layers: ['modules-fill', 'areas-fill'] });
   if (f.length){ selectedObsId = null; selectedAreaId = f[0].properties.areaId || f[0].properties.id; renderAll(); openPanels(); }
-  else if (map.queryRenderedFeatures(e.point, { layers: ['nb-fill'] }).length) editNeighbour(map.queryRenderedFeatures(e.point, { layers: ['nb-fill'] })[0].properties.id);
   else if (selectedAreaId || selectedObsId){ selectedAreaId = null; selectedObsId = null; closeSheet(); renderAll(); }
 }
-$('#dUndo').onclick = () => { draft.pop(); if (!draft.length) lastOsm = null; updateDrawBar(); };
+$('#dUndo').onclick = () => { draft.pop(); updateDrawBar(); };
 $('#dCancel').onclick = () => exitDraw();
 $('#dFinish').onclick = () => finishDraw();
 function finishDraw(){
@@ -1251,13 +993,10 @@ function finishDraw(){
   }
   if (areaM2(pts) < 2) return toast('Area too small');
   const area = { id: uid(), name: 'Area ' + (project.areas.length + 1), ring: draft.slice(), settings: defaultSettings(), modules: [], stats: null };
-  if (lastOsm) area.osm = lastOsm;
   project.areas.push(area); selectedAreaId = area.id;
-  if (area.osm && project.site?.roofHsrc !== 'user'){ const h = osmHeight(area.osm); if (h != null) siteSet({ roofH: h, roofHsrc: 'osm' }); }
   exitDraw(true); markDirty(); renderAll();
   toast(`${area.name}: ${fmt(areaM2(pts), 1)} m² — now choose the module`);
   setTimeout(openPanels, 350);
-  if (!project.site?.nbFetched) setTimeout(() => findNeighbours(true), 900);
 }
 
 // ---------------- Panels & layout sheet ----------------
@@ -1340,7 +1079,6 @@ function renderSheet(keepScroll){
       const sbE = st && st.edgeSetbacks ? st.edgeSetbacks[i] : null;
       return `<div class="edgeRow"><div class="e">E${i + 1}</div><div>${fmt(Math.hypot(B1[0] - A1[0], B1[1] - A1[1]), 1)} m · faces ${compass(nrm)}<small>${sbE != null ? 'setback ' + fmt(sbE, 2) + ' m' : 'parapet height →'}</small></div>${num('par' + i, (s.parapets || [])[i] || '', 'm', '0')}</div>`; }).join('')}</div>
     <div class="note">Parapets on the equator-facing side push panels back by their shadow length; the north side (south in the southern hemisphere) only keeps the base setback. Obstacles: tap the red ⊠ button.</div>
-    ${nbSection()}
 
     <button class="btn-primary go-btn" id="runLayout">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><rect x="3" y="4" width="7" height="7" rx="1"/><rect x="14" y="4" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
@@ -1369,18 +1107,17 @@ function renderSheet(keepScroll){
   };
   sh.querySelectorAll('#areaTabs [data-a]').forEach(b => b.onclick = () => { selectedAreaId = b.dataset.a; renderSheet(); renderAll(); });
   sh.querySelectorAll('.mod').forEach(m => m.onclick = () => { s.panelId = m.dataset.pid; changed(); });
-  sh.querySelectorAll('[data-seg]').forEach(g => g.querySelectorAll('button').forEach(b => b.onclick = () => { const k = g.dataset.seg; if (k === 'nbAvoid'){ siteSet({ nbAvoid: b.dataset.v === 'on' }); relayoutAll(); renderAll(); renderSheet(true); return; } if (k === 'shadeWin'){ project.shadeWin = +b.dataset.v; relayoutAll(); renderAll(); renderSheet(true); return; } s[k] = k === 'fillGaps' ? b.dataset.v === 'on' : b.dataset.v; changed(); }));
+  sh.querySelectorAll('[data-seg]').forEach(g => g.querySelectorAll('button').forEach(b => b.onclick = () => { const k = g.dataset.seg; if (k === 'shadeWin'){ project.shadeWin = +b.dataset.v; relayoutAll(); renderAll(); renderSheet(true); return; } s[k] = k === 'fillGaps' ? b.dataset.v === 'on' : b.dataset.v; changed(); }));
   sh.querySelectorAll('[data-num]').forEach(i => i.onchange = () => { const v = i.value.trim().replace(',', '.');
     if (i.dataset.num === 'parapetAll'){ const x = +v; if (!isNaN(x)) { s.parapets = a.ring.map(() => x); changed(); } return; }
     if (/^par\d+$/.test(i.dataset.num)){ const k = +i.dataset.num.slice(3); s.parapets = a.ring.map((_, j) => (s.parapets || [])[j] || 0); s.parapets[k] = isNaN(+v) ? 0 : +v; changed(); return; } s[i.dataset.num] = (i.dataset.num === 'rowGap' && v === '') ? '' : (isNaN(+v) ? s[i.dataset.num] : +v); changed(); });
   $('#importDb').onclick = () => $('#fileIn').click();
   $('#clearPar').onclick = () => { s.parapets = []; changed(); };
   $('#runLayout').onclick = () => runLayout(a, true);
-  wireNbSection();
   function changed(){
     const { parapets, ...rest } = s; LS.set('solarscout.lastSettings', rest);
     renderAll();
-    if (a.stats || a.modules?.length) runLayout(a, false); else { markDirty(); renderSheet(true); }
+    if (a.modules?.length) runLayout(a, false); else { markDirty(); renderSheet(true); }
   }
 }
 function runLayout(a, announce){
@@ -1388,7 +1125,7 @@ function runLayout(a, announce){
   const btn = $('#runLayout'); if (btn) btn.innerHTML = `<span class="spinner"></span> Distributing…`;
   setTimeout(() => {
     const t0 = performance.now();
-    const res = computeLayout(a.ring, pnl, a.settings, { obstacles: layoutObstacles(), shadeWin: project.shadeWin || 0 });
+    const res = computeLayout(a.ring, pnl, a.settings, { obstacles: project.obstacles, shadeWin: project.shadeWin || 0 });
     a.modules = res.modules; a.orients = res.orients; a.stats = res.stats;
     markDirty(); renderAll(); renderSheet(true);
     if (announce) toast(res.stats.count ? `${res.stats.count} × ${pnl.pmax} W = ${fmt(res.stats.kwp, 2)} kWp (${Math.round(performance.now() - t0)} ms)` : 'No module fits — reduce setback or check the outline');
@@ -1396,7 +1133,7 @@ function runLayout(a, announce){
 }
 
 function relayoutAll(){
-  project.areas.forEach(a => { if (a.stats || a.modules?.length){ const r = computeLayout(a.ring, panelById(a.settings.panelId), a.settings, { obstacles: layoutObstacles(), shadeWin: project.shadeWin || 0 }); a.modules = r.modules; a.orients = r.orients; a.stats = r.stats; } });
+  project.areas.forEach(a => { if (a.modules?.length){ const r = computeLayout(a.ring, panelById(a.settings.panelId), a.settings, { obstacles: project.obstacles, shadeWin: project.shadeWin || 0 }); a.modules = r.modules; a.orients = r.orients; a.stats = r.stats; } });
 }
 // ---------------- Obstacle sheet ----------------
 function openObstacle(id){
@@ -1475,7 +1212,7 @@ function sunScene(sun, O){
   const vec = h => [-Math.sin(sun.az) * h * k, -Math.cos(sun.az) * h * k];
   const add = (p, v) => [p[0] + v[0], p[1] + v[1]];
   const shadows = [], targets = [];
-  (project.obstacles || []).concat(nbObstacles()).forEach(ob => {
+  (project.obstacles || []).forEach(ob => {
     const h = Number(ob.height) || 0; if (h <= 0) return;
     const b = ob.ring.map(P.fwd), v = vec(h);
     shadows.push({ pts: convexHull(b.concat(b.map(p => add(p, v)))), src: 'o' });
@@ -1622,7 +1359,7 @@ function enterSun(){
   if (!project || !sunSite()) return toast('First find the site: search or use your location');
   exitDraw(true); closeSheet(); mode = 'sun'; selectedObsId = null;
   // older tilted layouts don't know which way they face — recompute once
-  project.areas.forEach(a => { if (a.modules?.length && a.settings.mount === 'tilted' && a.stats && a.stats.faceAz == null){ const r = computeLayout(a.ring, panelById(a.settings.panelId), a.settings, { obstacles: layoutObstacles(), shadeWin: project.shadeWin || 0 }); a.modules = r.modules; a.orients = r.orients; a.stats = r.stats; } });
+  project.areas.forEach(a => { if (a.modules?.length && a.settings.mount === 'tilted' && a.stats && a.stats.faceAz == null){ const r = computeLayout(a.ring, panelById(a.settings.panelId), a.settings, { obstacles: project.obstacles, shadeWin: project.shadeWin || 0 }); a.modules = r.modules; a.orients = r.orients; a.stats = r.stats; } });
   if (!sunSt.date) sunSt.date = todayStr();
   const O = sunSite(), tz = sunTz(O), now = new Date();
   // start at the site's current clock time if the sun is up, else at solar noon
@@ -1667,7 +1404,7 @@ function renderSun(){
   if (!sunSt.marker){ const el = document.createElement('div'); el.className = 'sunMk'; el.textContent = '☀️'; sunSt.marker = new maplibregl.Marker({ element: el }).setLngLat(end).addTo(map); }
   else sunSt.marker.setLngLat(end);
   const shadeTxt = sc.total ? `<b>${sc.shaded.length}</b> of ${sc.total} modules shaded` : 'No modules laid out yet';
-  $('#sunInfo').innerHTML = `☀ Az <b>${Math.round(sun.az / D2R)}° ${compass(sun.az)}</b> · El <b>${elD.toFixed(1)}°</b> · ${times} · UTC${tz >= 0 ? '+' : ''}${tz}<br>${shadeTxt} · ${(project.obstacles || []).filter(o => +o.height > 0).length} obstacle(s) · ${nbObstacles().length ? nbObstacles().length + ' taller neighbour(s) · ' : ''}${project.areas.reduce((s, a) => s + (a.settings.parapets || []).filter(h => +h > 0).length, 0)} parapet edge(s)`;
+  $('#sunInfo').innerHTML = `☀ Az <b>${Math.round(sun.az / D2R)}° ${compass(sun.az)}</b> · El <b>${elD.toFixed(1)}°</b> · ${times} · UTC${tz >= 0 ? '+' : ''}${tz}<br>${shadeTxt} · ${(project.obstacles || []).filter(o => +o.height > 0).length} obstacle(s) · ${project.areas.reduce((s, a) => s + (a.settings.parapets || []).filter(h => +h > 0).length, 0)} parapet edge(s)`;
   if ($('#sheet').classList.contains('open') && $('#sunCv')) drawSunChartIn();
 }
 function sunStop(){ sunSt.playing = false; clearInterval(sunSt.timer); sunSt.timer = null; $('#sunPlay').textContent = '▶'; }
